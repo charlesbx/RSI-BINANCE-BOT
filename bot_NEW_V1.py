@@ -493,12 +493,12 @@ def on_message(ws, message):
     else:
         closes[-1] = float(close)
     #### Condition to exit the program when a certain amount has been lost or win
-    if walletUSD > 50 and walletUSD <= walletBASE - 150:
-        closed()
-    if walletUSD - walletBASE >= percent.percentage(3, walletBASE):
-        closed()
-    if walletUSD > walletBASE + 500:
-        closed()
+    # if walletUSD > 50 and walletUSD <= walletBASE - 150:
+    #     closed()
+    # if walletUSD - walletBASE >= percent.percentage(3, walletBASE):
+    #     closed()
+    # if walletUSD > walletBASE + 500:
+    #     closed()
     #### Handling the fact that there is no value in the aray at the beggining
     if len(closes) > RSI_PERIOD:
         
