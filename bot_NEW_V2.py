@@ -450,10 +450,10 @@ def on_message(ws, message):
     candle = json_message['k']
     is_candle_closed = candle['x']
     ticker = client.get_ticker(symbol=TRADE_SYMBOL)
-    if datetime.now() >= endTime:
-        endASAP = True
-    if endASAP and in_position == False:
-        closed()
+    # if datetime.now() >= endTime:
+    #     endASAP = True
+    # if endASAP and in_position == False:
+    #     closed()
     # top_price = float(ticker["highPrice"])
     # top_price = top_price - percent.percentage(0.25, top_price)
     close = candle['c']
