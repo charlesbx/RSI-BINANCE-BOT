@@ -419,5 +419,7 @@ class TradingBot:
             'current_balance': self.current_balance,
             'position': self.position.to_dict() if self.position else None,
             'stats': self.stats.to_dict(),
-            'strategy_status': self.strategy.get_status_message(self.position, self.current_rsi)
+            'strategy_status': self.strategy.get_status_message(self.position, self.current_rsi),
+            'oversold_intensity': round(self.strategy.oversold_intensity, 2),
+            'oversold_counter': self.strategy.oversold_counter
         }

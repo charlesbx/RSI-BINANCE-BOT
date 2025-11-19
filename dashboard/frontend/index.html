@@ -223,20 +223,18 @@
                 <div class="card-subtitle" id="rsiStatus">Neutral</div>
             </div>
 
+            <!-- Oversold Intensity (NEW) -->
+            <div class="card">
+                <div class="card-title">Oversold Signal</div>
+                <div class="card-value" id="oversoldIntensity">0.0</div>
+                <div class="card-subtitle" id="oversoldStatus">No signal</div>
+            </div>
+
             <!-- Balance -->
             <div class="card">
                 <div class="card-title">Current Balance</div>
                 <div class="card-value" id="balance">$0.00</div>
                 <div class="card-subtitle" id="balanceChange">+$0.00 (0.00%)</div>
-            </div>
-
-            <!-- Total Trades -->
-            <div class="card">
-                <div class="card-title">Total Trades</div>
-                <div class="card-value" id="totalTrades">0</div>
-                <div class="card-subtitle">
-                    <span id="winRate">0%</span> win rate
-                </div>
             </div>
         </div>
 
@@ -348,6 +346,30 @@
             } else {
                 rsiStatusEl.textContent = 'Neutral';
                 rsiStatusEl.className = 'card-subtitle';
+            }
+
+            // Oversold Intensity (NEW)
+            const intensity = data.oversold_intensity || 0;
+            const oversoldCount = data.oversold_counter || 0;
+            document.getElementById('oversoldIntensity').textContent = intensity.toFixed(1);
+            const oversoldStatusEl = document.getElementById('oversoldStatus');
+            
+            if (intensity >= 10.0) {
+                oversoldStatusEl.textContent = '🔥 STRONG SIGNAL';
+                oversoldStatusEl.className = 'card-subtitle positive';
+                oversoldStatusEl.style.fontWeight = 'bold';
+            } else if (intensity >= 5.0) {
+                oversoldStatusEl.textContent = `⚡ Building (${oversoldCount}x)`;
+                oversoldStatusEl.className = 'card-subtitle positive';
+                oversoldStatusEl.style.fontWeight = 'normal';
+            } else if (intensity > 0) {
+                oversoldStatusEl.textContent = `💤 Fading (${oversoldCount}x)`;
+                oversoldStatusEl.className = 'card-subtitle';
+                oversoldStatusEl.style.fontWeight = 'normal';
+            } else {
+                oversoldStatusEl.textContent = 'No signal';
+                oversoldStatusEl.className = 'card-subtitle';
+                oversoldStatusEl.style.fontWeight = 'normal';
             }
 
             // Balance

@@ -42,6 +42,8 @@ class RSIStrategy:
         
         # Buy condition tracking
         self.oversold_counter: int = 0
+        self.oversold_intensity: float = 0.0  # Accumulated oversold strength
+        self.oversold_start_time: Optional[datetime] = None
         self.last_sell_time: Optional[datetime] = None
         
         # State flags
@@ -109,17 +111,58 @@ class RSIStrategy:
         # Calculate dynamic thresholds
         top_price_threshold = self.highest_price - calculate_percentage(0.75, self.highest_price)
         
-        # RSI oversold condition
+        # === SYSTÈME D'INTENSITÉ OVERSOLD ===
+        # Plus le RSI est bas et longtemps, plus l'intensité augmente
         if current_rsi < self.rsi_oversold:
+            # Marquer le début de la période oversold
+            if self.oversold_start_time is None:
+                self.oversold_start_time = datetime.now()
+            
+            # Calculer l'intensité : plus le RSI est bas, plus ça compte
+            # RSI à 20 = intensité 2x, RSI à 10 = intensité 3x
+            intensity_multiplier = (self.rsi_oversold - current_rsi) / 10
+            self.oversold_intensity += 1.0 + intensity_multiplier
+            
             self.oversold_counter += 1
-            self.logger.debug(f"Oversold counter: {self.oversold_counter}")
+            
+            # Durée en oversold (bonus après 5 minutes)
+            if self.oversold_start_time:
+                oversold_duration = (datetime.now() - self.oversold_start_time).total_seconds() / 60
+                if oversold_duration > 5:
+                    self.oversold_intensity += 0.5  # Bonus durée
+            
+            self.logger.debug(f"Oversold: RSI={current_rsi:.1f}, Intensity={self.oversold_intensity:.1f}, Count={self.oversold_counter}")
         
-        # Reset counter if RSI goes too high
-        if current_rsi > self.rsi_overbought:
-            self.oversold_counter = 0
+        elif current_rsi < self.rsi_oversold + 5:
+            # Zone tampon : RSI proche oversold, maintien partiel
+            self.oversold_intensity = max(0, self.oversold_intensity - 0.2)
         
-        # Buy conditions
-        rsi_counter_met = self.oversold_counter > self.config.trading.MIN_RSI_COUNTER
+        elif current_rsi < 45:
+            # RSI bas mais pas oversold : décroissance lente
+            self.oversold_intensity = max(0, self.oversold_intensity - 0.5)
+            if self.oversold_counter > 0:
+                self.oversold_counter = max(0, self.oversold_counter - 1)
+        
+        else:
+            # RSI neutre/haut : reset progressif
+            if self.oversold_intensity > 5:
+                # Reset fort si on avait une bonne intensité
+                self.oversold_intensity = max(0, self.oversold_intensity - 2.0)
+            else:
+                # Reset complet si faible intensité
+                self.oversold_intensity = 0
+                self.oversold_counter = 0
+                self.oversold_start_time = None
+            
+            if self.oversold_intensity == 0:
+                self.logger.debug(f"Oversold signals reset (RSI: {current_rsi:.1f})")
+        
+        # Buy conditions améliorées
+        # Soit le compteur basique (3+ cycles), soit une forte intensité (10+)
+        rsi_counter_met = (
+            self.oversold_counter >= self.config.trading.MIN_RSI_COUNTER or
+            self.oversold_intensity >= 10.0
+        )
         price_condition_met = current_price <= top_price_threshold
         
         # RSI bounce confirmation
@@ -133,13 +176,17 @@ class RSIStrategy:
         # Buy signal logic
         if rsi_counter_met and price_condition_met and rsi_bounced:
             reason = []
-            if rsi_counter_met:
+            if self.oversold_intensity >= 10.0:
+                reason.append(f"Strong oversold (intensity: {self.oversold_intensity:.1f})")
+            elif self.oversold_counter >= self.config.trading.MIN_RSI_COUNTER:
                 reason.append(f"RSI oversold x{self.oversold_counter}")
             if rsi_bounced:
                 reason.append(f"RSI bounce +{current_rsi - self.lowest_rsi:.1f}")
             
             # Reset counters
             self.oversold_counter = 0
+            self.oversold_intensity = 0.0
+            self.oversold_start_time = None
             self.lowest_rsi = 100.0
             
             return True, " | ".join(reason)
@@ -313,7 +360,12 @@ class RSIStrategy:
         if not position:
             status = f"🔍 Waiting for BUY | RSI: {current_rsi:.1f}"
             if current_rsi < self.rsi_oversold:
-                status += f" (Oversold x{self.oversold_counter})"
+                if self.oversold_intensity >= 10.0:
+                    status += f" 🔥 (Intensity: {self.oversold_intensity:.1f})"
+                else:
+                    status += f" ⚡ (x{self.oversold_counter}, Int: {self.oversold_intensity:.1f})"
+            elif self.oversold_intensity > 0:
+                status += f" 💤 (Fading: {self.oversold_intensity:.1f})"
             return status
         
         # In position
