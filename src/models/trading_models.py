@@ -13,6 +13,12 @@ class TradeType(Enum):
     SELL = "SELL"
 
 
+class PositionSide(Enum):
+    """Position side enumeration for Futures"""
+    LONG = "LONG"
+    SHORT = "SHORT"
+
+
 class TradeResult(Enum):
     """Trade result enumeration"""
     WIN = "WIN"
@@ -81,6 +87,7 @@ class Position:
     entry_price: float
     entry_time: datetime
     entry_rsi: float
+    side: PositionSide = PositionSide.LONG  # LONG or SHORT for Futures
     current_price: float = 0.0
     current_rsi: float = 0.0
     unrealized_pnl: float = 0.0
@@ -90,8 +97,14 @@ class Position:
         """Update current position values"""
         self.current_price = current_price
         self.current_rsi = current_rsi
-        self.unrealized_pnl = (current_price - self.entry_price) * self.quantity
-        self.unrealized_pnl_percentage = ((current_price / self.entry_price) - 1) * 100
+        
+        # Calculate P&L based on position side
+        if self.side == PositionSide.LONG:
+            self.unrealized_pnl = (current_price - self.entry_price) * self.quantity
+            self.unrealized_pnl_percentage = ((current_price / self.entry_price) - 1) * 100
+        else:  # SHORT
+            self.unrealized_pnl = (self.entry_price - current_price) * self.quantity
+            self.unrealized_pnl_percentage = ((self.entry_price / current_price) - 1) * 100
     
     def to_dict(self) -> dict:
         """Convert to dictionary"""
@@ -101,6 +114,7 @@ class Position:
             "entry_price": self.entry_price,
             "entry_time": self.entry_time.isoformat(),
             "entry_rsi": self.entry_rsi,
+            "side": self.side.value,
             "current_price": self.current_price,
             "current_rsi": self.current_rsi,
             "unrealized_pnl": self.unrealized_pnl,
