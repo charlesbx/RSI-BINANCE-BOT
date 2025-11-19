@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSI Trading Bot Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 32px;
+        }
+
+        .status-badge {
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .status-running {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .status-stopped {
+            background: #f44336;
+            color: white;
+        }
+
+        .status-simulation {
+            background: #FF9800;
+            color: white;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .card-title {
+            font-size: 14px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .card-value {
+            font-size: 36px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .card-subtitle {
+            font-size: 14px;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        .positive {
+            color: #4CAF50 !important;
+        }
+
+        .negative {
+            color: #f44336 !important;
+        }
+
+        .position-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .position-card .card-title {
+            color: rgba(255,255,255,0.9);
+        }
+
+        .position-card .card-value {
+            color: white;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            background: rgba(0,0,0,0.05);
+            border-radius: 8px;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .chart-container {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-top: 20px;
+            height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #999;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: white;
+            font-size: 18px;
+        }
+
+        .no-position {
+            text-align: center;
+            padding: 40px;
+            color: rgba(255,255,255,0.7);
+            font-size: 16px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .live-indicator {
+            width: 12px;
+            height: 12px;
+            background: #4CAF50;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div>
+                <h1>📊 RSI Trading Bot Dashboard</h1>
+                <div class="connection-status">
+                    <span class="live-indicator"></span>
+                    <span>Real-time monitoring</span>
+                </div>
+            </div>
+            <div>
+                <div id="botStatus" class="status-badge status-stopped">●  LOADING...</div>
+            </div>
+        </div>
+
+        <!-- Main Stats -->
+        <div class="grid">
+            <!-- Current Price -->
+            <div class="card">
+                <div class="card-title">Current Price</div>
+                <div class="card-value" id="currentPrice">$0.00</div>
+                <div class="card-subtitle" id="symbol">-</div>
+            </div>
+
+            <!-- RSI -->
+            <div class="card">
+                <div class="card-title">RSI</div>
+                <div class="card-value" id="rsi">0</div>
+                <div class="card-subtitle" id="rsiStatus">Neutral</div>
+            </div>
+
+            <!-- Balance -->
+            <div class="card">
+                <div class="card-title">Current Balance</div>
+                <div class="card-value" id="balance">$0.00</div>
+                <div class="card-subtitle" id="balanceChange">+$0.00 (0.00%)</div>
+            </div>
+
+            <!-- Total Trades -->
+            <div class="card">
+                <div class="card-title">Total Trades</div>
+                <div class="card-value" id="totalTrades">0</div>
+                <div class="card-subtitle">
+                    <span id="winRate">0%</span> win rate
+                </div>
+            </div>
+        </div>
+
+        <!-- Current Position -->
+        <div class="card position-card">
+            <div class="card-title">📈 CURRENT POSITION</div>
+            <div id="positionContent">
+                <div class="no-position">No active position</div>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="card" style="margin-top: 20px;">
+            <div class="card-title">📊 TRADING STATISTICS</div>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-label">Winning Trades</span>
+                    <span class="stat-value positive" id="winningTrades">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Losing Trades</span>
+                    <span class="stat-value negative" id="losingTrades">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Average Profit</span>
+                    <span class="stat-value positive" id="avgProfit">$0.00</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Average Loss</span>
+                    <span class="stat-value negative" id="avgLoss">$0.00</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Largest Win</span>
+                    <span class="stat-value positive" id="largestWin">$0.00</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Largest Loss</span>
+                    <span class="stat-value negative" id="largestLoss">$0.00</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Avg Duration</span>
+                    <span class="stat-value" id="avgDuration">0 min</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Runtime</span>
+                    <span class="stat-value" id="runtime">0h</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:5000/api';
+        
+        function formatCurrency(value) {
+            return '$' + parseFloat(value).toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        function formatPercentage(value) {
+            const sign = value >= 0 ? '+' : '';
+            return sign + parseFloat(value).toFixed(2) + '%';
+        }
+
+        async function fetchData() {
+            try {
+                const response = await fetch(`${API_URL}/status`);
+                if (!response.ok) throw new Error('Failed to fetch data');
+                
+                const data = await response.json();
+                updateDashboard(data);
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                document.getElementById('botStatus').textContent = '● ERROR';
+                document.getElementById('botStatus').className = 'status-badge status-stopped';
+            }
+        }
+
+        function updateDashboard(data) {
+            // Bot status
+            const statusEl = document.getElementById('botStatus');
+            if (data.is_running) {
+                statusEl.textContent = data.is_simulation ? '● SIMULATION' : '● LIVE';
+                statusEl.className = data.is_simulation ? 'status-badge status-simulation' : 'status-badge status-running';
+            } else {
+                statusEl.textContent = '● STOPPED';
+                statusEl.className = 'status-badge status-stopped';
+            }
+
+            // Symbol
+            document.getElementById('symbol').textContent = data.symbol;
+
+            // Current price
+            document.getElementById('currentPrice').textContent = formatCurrency(data.current_price || 0);
+
+            // RSI
+            const rsi = data.current_rsi || 0;
+            document.getElementById('rsi').textContent = rsi.toFixed(2);
+            const rsiStatusEl = document.getElementById('rsiStatus');
+            if (rsi >= 70) {
+                rsiStatusEl.textContent = 'Overbought';
+                rsiStatusEl.className = 'card-subtitle negative';
+            } else if (rsi <= 30) {
+                rsiStatusEl.textContent = 'Oversold';
+                rsiStatusEl.className = 'card-subtitle positive';
+            } else {
+                rsiStatusEl.textContent = 'Neutral';
+                rsiStatusEl.className = 'card-subtitle';
+            }
+
+            // Balance
+            const stats = data.stats || {};
+            const balance = stats.current_balance || 0;
+            const startBalance = stats.start_balance || 0;
+            const balanceChange = balance - startBalance;
+            const balanceChangePct = startBalance > 0 ? (balanceChange / startBalance * 100) : 0;
+            
+            document.getElementById('balance').textContent = formatCurrency(balance);
+            const balanceChangeEl = document.getElementById('balanceChange');
+            balanceChangeEl.textContent = `${formatCurrency(balanceChange)} (${formatPercentage(balanceChangePct)})`;
+            balanceChangeEl.className = balanceChange >= 0 ? 'card-subtitle positive' : 'card-subtitle negative';
+
+            // Total trades
+            document.getElementById('totalTrades').textContent = stats.total_trades || 0;
+            document.getElementById('winRate').textContent = (stats.win_rate || 0).toFixed(1) + '%';
+
+            // Position
+            const position = data.position;
+            const positionContent = document.getElementById('positionContent');
+            if (position) {
+                const pnl = position.unrealized_pnl || 0;
+                const pnlPct = position.unrealized_pnl_percentage || 0;
+                const pnlClass = pnl >= 0 ? 'positive' : 'negative';
+                
+                positionContent.innerHTML = `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+                        <div>
+                            <div style="opacity: 0.8; margin-bottom: 5px;">Entry Price</div>
+                            <div style="font-size: 24px; font-weight: bold;">${formatCurrency(position.entry_price)}</div>
+                        </div>
+                        <div>
+                            <div style="opacity: 0.8; margin-bottom: 5px;">Current Price</div>
+                            <div style="font-size: 24px; font-weight: bold;">${formatCurrency(position.current_price)}</div>
+                        </div>
+                        <div>
+                            <div style="opacity: 0.8; margin-bottom: 5px;">Quantity</div>
+                            <div style="font-size: 18px; font-weight: bold;">${parseFloat(position.quantity).toFixed(6)}</div>
+                        </div>
+                        <div>
+                            <div style="opacity: 0.8; margin-bottom: 5px;">Unrealized P&L</div>
+                            <div style="font-size: 24px; font-weight: bold;" class="${pnlClass}">
+                                ${formatCurrency(pnl)} (${formatPercentage(pnlPct)})
+                            </div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.2);">
+                        <span style="opacity: 0.8;">Time in position:</span> ${(position.time_held_minutes || 0).toFixed(1)} minutes
+                    </div>
+                `;
+            } else {
+                positionContent.innerHTML = '<div class="no-position">No active position</div>';
+            }
+
+            // Statistics
+            document.getElementById('winningTrades').textContent = stats.winning_trades || 0;
+            document.getElementById('losingTrades').textContent = stats.losing_trades || 0;
+            document.getElementById('avgProfit').textContent = formatCurrency(stats.average_profit || 0);
+            document.getElementById('avgLoss').textContent = formatCurrency(Math.abs(stats.average_loss || 0));
+            document.getElementById('largestWin').textContent = formatCurrency(stats.largest_win || 0);
+            document.getElementById('largestLoss').textContent = formatCurrency(Math.abs(stats.largest_loss || 0));
+            document.getElementById('avgDuration').textContent = (stats.average_trade_duration || 0).toFixed(1) + ' min';
+            document.getElementById('runtime').textContent = (stats.runtime_hours || 0).toFixed(1) + 'h';
+        }
+
+        // Initial fetch
+        fetchData();
+
+        // Auto-refresh every 2 seconds
+        setInterval(fetchData, 2000);
+    </script>
+</body>
+</html>
