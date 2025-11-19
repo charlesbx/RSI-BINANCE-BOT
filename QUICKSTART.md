@@ -6,7 +6,7 @@ Get your RSI Trading Bot up and running in 5 minutes!
 
 ```bash
 # 1. Clone & navigate
-git clone https://github.com/yourusername/RSI-BINANCE-BOT.git
+git clone https://github.com/charlesbx/RSI-BINANCE-BOT.git
 cd RSI-BINANCE-BOT
 
 # 2. Run quick start script
@@ -33,7 +33,7 @@ python main.py --interactive
 
 ```bash
 # Download the project
-git clone https://github.com/yourusername/RSI-BINANCE-BOT.git
+git clone https://github.com/charlesbx/RSI-BINANCE-BOT.git
 cd RSI-BINANCE-BOT
 
 # Run setup script
@@ -325,9 +325,8 @@ python -c "from config.settings import AppConfig; AppConfig().initialize()"
 ## 📞 Getting Help
 
 - **Documentation**: Check `/docs` folder
-- **Issues**: [GitHub Issues](https://github.com/yourusername/RSI-BINANCE-BOT/issues)
+- **Issues**: [GitHub Issues](https://github.com/charlesbx/RSI-BINANCE-BOT/issues)
 - **Logs**: Check `logs/trading_bot.log`
-- **Email**: your.email@example.com
 
 ## 🎉 You're Ready!
 

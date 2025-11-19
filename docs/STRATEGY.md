@@ -39,48 +39,115 @@ RS = Average Gain / Average Loss
 
 ## Entry Strategy (Buy Signals)
 
-### Primary Buy Conditions
+### Oversold Intensity System
 
-The bot will consider buying when **ALL** of the following conditions are met:
+The bot uses an advanced **intensity-based system** instead of simple counter-based logic. This makes the bot more responsive to strong oversold conditions.
 
-#### 1. RSI Oversold
+#### How Intensity Works
+
+**Accumulation:**
 ```python
-current_rsi < 30  # Oversold threshold
+# Each candle in oversold zone:
+if RSI < 30:
+    depth = (30 - RSI) / 30  # 0.0 to 1.0
+    intensity += depth * 2.0  # Stronger when deeper
+    
+    # Duration bonus (after 5+ minutes)
+    if oversold_duration >= 5_minutes:
+        intensity += 0.5  # Extra accumulation
 ```
 
-#### 2. Oversold Counter
+**Decay (Smart fade-out):**
 ```python
-oversold_counter > 200  # RSI stayed oversold for 200 candles
+if RSI >= 30:
+    if RSI < 35:  # Buffer zone
+        intensity *= 0.95  # Slow fade (5% per candle)
+    else:
+        intensity *= 0.85  # Faster fade (15% per candle)
 ```
-This prevents buying too early during a downtrend.
 
-#### 3. RSI Bounce Confirmation
+#### Buy Triggers (Dual System)
+
+The bot will buy when **ONE** of these conditions is met:
+
+##### Trigger 1: Strong Intensity
 ```python
-current_rsi >= lowest_rsi + 5  # RSI bounced back 5 points
+oversold_intensity >= 10.0  # Strong accumulated signal
 ```
-This confirms the oversold period has ended.
 
-#### 4. Price Condition
+##### Trigger 2: Traditional Counter
+```python
+oversold_counter >= 3  # 3 consecutive oversold candles
+```
+
+#### Additional Confirmations
+
+All buy signals must also satisfy:
+
+##### 1. RSI Bounce Confirmation
+```python
+current_rsi >= lowest_rsi + 3  # RSI bounced back 3 points (was 5)
+```
+This confirms the oversold period is ending.
+
+##### 2. Price Condition
 One of:
 - Price at lowest observed price
 - Price below 0.75% of highest price
 
-#### 5. Time Restriction
+##### 3. Time Restriction
 ```python
-time_since_last_sell > 10 minutes
+time_since_last_sell >= 5 minutes  # Reduced from 10 minutes
 ```
 Prevents rapid buy-sell cycles.
 
 ### Buy Example
 
 ```
-Current Price: $2,000
-Lowest Price: $2,000
-RSI: 28 → 25 → 23 → 22 → 24 → 27 → 32 (BOUNCE!)
-Oversold Counter: 205 ✓
-Time since sell: 15 minutes ✓
+Scenario 1: Strong Intensity Buy
+================================
+Time  | Price  | RSI  | Intensity | Counter | Action
+------|--------|------|-----------|---------|-------
+10:00 | $2000  | 35   | 0.0       | 0       | -
+10:01 | $1995  | 29   | 1.4       | 1       | Accumulating
+10:02 | $1990  | 26   | 3.1       | 2       | Accumulating
+10:03 | $1985  | 23   | 5.3       | 3       | Accumulating  
+10:04 | $1982  | 22   | 7.8       | 4       | Accumulating
+10:05 | $1980  | 21   | 10.5      | 5       | 🔥 STRONG SIGNAL!
+10:06 | $1985  | 24   | 10.5      | 6       | RSI bounce +3
 
-→ BUY SIGNAL at $2,000
+→ BUY SIGNAL at $1985 (Intensity: 10.5)
+Reason: Strong intensity + RSI bounce confirmed
+
+Scenario 2: Quick Counter Buy
+=============================
+Time  | Price  | RSI  | Intensity | Counter | Action
+------|--------|------|-----------|---------|-------
+11:00 | $2000  | 35   | 0.0       | 0       | -
+11:01 | $1998  | 29   | 1.4       | 1       | Accumulating
+11:02 | $1996  | 28   | 2.9       | 2       | Accumulating
+11:03 | $1994  | 27   | 4.5       | 3       | ⚡ Counter = 3
+11:04 | $1997  | 31   | 4.3       | 0       | RSI bounce +4
+
+→ BUY SIGNAL at $1997 (Counter: 3, Intensity: 4.3)
+Reason: Counter threshold + RSI bounce confirmed
+```
+
+### Intensity Status Messages
+
+The bot shows different status based on intensity:
+
+- **💤 Fading (0 < intensity < 5)**: Signal weakening
+- **⚡ Building (5 ≤ intensity < 10)**: Signal strengthening  
+- **🔥 STRONG SIGNAL (intensity ≥ 10)**: Ready to buy
+
+### Configuration
+
+**Default Settings:**
+```python
+MIN_RSI_COUNTER = 3           # Minimum cycles (was 200)
+RSI_BOUNCE_THRESHOLD = 3      # Bounce confirmation (was 5)
+MIN_TIME_AFTER_SELL = 5       # Minutes (was 10)
 ```
 
 ## Exit Strategy (Sell Signals)
@@ -118,51 +185,125 @@ Current: $2,065 (+3.25%)
 P&L: +$65 (+3.25%)
 ```
 
-### 3. Loss Prevention (Time-Based)
+### 3. Adaptive Loss Prevention (Time-Based)
 
-#### Stage 1: Sell at Buy Price (1 hour + -0.5% loss)
+The bot now uses an **adaptive system** that analyzes price trends and adjusts sell timing accordingly.
+
+#### Price Trend Detection
+
+```python
+# Calculate recent price movement
+recent_change = (current_price - price_5min_ago) / entry_price * 100
+
+if recent_change > 0.3:
+    trend = "recovering"      # Price trending up
+elif recent_change < -0.3:
+    trend = "deteriorating"  # Price trending down  
+else:
+    trend = "neutral"        # Price stable
 ```
+
+#### Adaptive Threshold Modifiers
+
+Based on the detected trend, the bot adjusts when to activate sell modes:
+
+```python
+if trend == "deteriorating":
+    multiplier = 0.7   # Activate 30% FASTER
+elif trend == "recovering":
+    multiplier = 1.3   # Activate 30% SLOWER
+else:
+    multiplier = 1.0   # Normal timing
+```
+
+#### Stage 1: Sell at Buy Price (30 min + -0.5% loss)
+```python
+# Base threshold: 0.5 hours (30 minutes)
+threshold = 0.5 * multiplier
+
 Entry: $2,000
-Held for: 1.5 hours
+Held for: 0.35 hours (21 minutes)
 Current: $1,990 (-0.5%)
-RSI: 28 (oversold)
+Trend: deteriorating
+Adjusted threshold: 0.5 * 0.7 = 0.35 hours ✓
 
 → Wait for price ≥ $2,003 (+0.15%)
 → SELL SIGNAL (Minimal loss recovery)
 ```
 
-#### Stage 2: Fast Sell (2 hours + -1% loss)
-```
+#### Stage 2: Fast Sell (1.5 hours + -1% loss)
+```python
+# Base threshold: 1.5 hours  
+threshold = 1.5 * multiplier
+
 Entry: $2,000
-Held for: 2.5 hours
+Held for: 1.2 hours
 Current: $1,980 (-1.0%)
-RSI: 29 (oversold)
+Trend: recovering
+Adjusted threshold: 1.5 * 1.3 = 1.95 hours ✗
 
-→ Wait for price ≥ $1,985 (-0.75%)
-→ SELL SIGNAL (Reduced loss)
+→ Not activated yet (price recovering, give it time)
 ```
 
-#### Stage 3: Very Fast Sell (3 hours + -2% loss)
-```
+#### Stage 3: Progressive Very Fast (2.5+ hours + -2% loss)
+```python
+# Base threshold: 2.5 hours
+threshold = 2.5 * multiplier
+
+# Progressive targets based on time held:
+if held < 1.0h:  target = -1.0%
+if held < 1.5h:  target = -1.5%  
+else:            target = -2.0%
+
 Entry: $2,000
-Held for: 3+ hours
-Loss threshold increases over time:
-  - 3-4 hours: -1.0%
-  - 4-5 hours: -1.5%
-  - 5-6 hours: -2.0%
-  - 6+ hours: -8.0% (emergency)
+Held for: 2.0 hours
+Current: $1,970 (-1.5%)
+Trend: neutral
+Adjusted threshold: 2.5 * 1.0 = 2.5 hours ✗
 
-→ SELL SIGNAL (Cut losses)
+→ Not activated yet
+
+Held for: 2.5 hours
+Trend: deteriorating
+Adjusted threshold: 2.5 * 0.7 = 1.75 hours ✓
+
+→ SELL SIGNAL at $1,970 (-1.5%)
 ```
 
-#### Stage 4: Emergency Exit (6 hours)
-```
+#### Stage 4: Emergency Exit (4 hours maximum)
+```python
+# Hard limit: 4 hours
+MAX_HOLD_HOURS = 4.0
+
 Entry: $2,000
-Held for: 6+ hours
-RSI: 72 (overbought)
+Held for: 4+ hours
+Current: $1,985 (-0.75%)
 
-→ SELL SIGNAL (Emergency exit regardless of price)
+→ SELL SIGNAL (Emergency exit with any loss)
+
+# Also force sell if RSI overbought:
+if held >= 4.0h and RSI >= 70:
+    → SELL SIGNAL (Regardless of profit/loss)
 ```
+
+### Comparison: Old vs New
+
+| Condition | Old System | New Adaptive System |
+|-----------|------------|---------------------|
+| Stage 1 | 1.0 hour fixed | 0.5h × (0.7-1.3) = 21-39 min |
+| Stage 2 | 2.0 hours fixed | 1.5h × (0.7-1.3) = 63-117 min |
+| Stage 3 | 3.0 hours fixed | 2.5h × (0.7-1.3) = 105-195 min |
+| Max Hold | 6.0 hours | 4.0 hours (stricter) |
+| Very Fast | Fixed -2% | Progressive: -1%, -1.5%, -2% |
+| Adaptation | None | Adjusts to price trend |
+
+### Benefits of Adaptive System
+
+1. **Faster exits** when price is deteriorating (cut losses sooner)
+2. **More patience** when price is recovering (give trades time to work)
+3. **Progressive targets** that get stricter over time
+4. **Stricter max hold** prevents very long losing trades
+5. **Market-responsive** rather than rigid time-based rules
 
 ## Risk Management
 
@@ -176,17 +317,17 @@ The bot uses your entire available balance for each trade (in simulation mode).
 
 ### Stop-Loss Strategy
 
-No fixed stop-loss. Instead, uses time-based progressive loss limits:
+No fixed stop-loss. Instead, uses **adaptive time-based** progressive loss limits:
 
-| Time Held | Maximum Acceptable Loss |
-|-----------|------------------------|
-| < 1 hour  | Unlimited (wait for signal) |
-| 1-2 hours | -0.5% → +0.15% |
-| 2-3 hours | -1.0% → -0.75% |
-| 3-4 hours | -2.0% → -1.0% |
-| 4-5 hours | -2.0% → -1.5% |
-| 5-6 hours | -2.0% → -2.0% |
-| 6+ hours  | Emergency exit |
+| Time Held | Maximum Acceptable Loss | Adaptive Range |
+|-----------|------------------------|----------------|
+| < 0.5h    | Unlimited (wait for signal) | - |
+| 0.5-1.5h  | -0.5% → +0.15% | 21-39 min (deteriorating) |
+| 1.5-2.5h  | -1.0% → -0.75% | 63-117 min (deteriorating) |
+| 2.5-4.0h  | Progressive: -1.0% → -1.5% → -2.0% | 105-195 min (deteriorating) |
+| 4.0+ hours | Emergency exit | Force sell any loss |
+
+**Note**: Thresholds adjust based on price trend (±30% activation time)
 
 ### Take-Profit Strategy
 
@@ -234,13 +375,15 @@ python main.py --symbol ETHUSDT --rsi-overbought 65 --rsi-oversold 35
 
 ### Oversold Counter
 
-**Default: 200**
+**Default: 3** (changed from 200)
 
-Controls how long RSI must stay oversold before buying:
+This now works alongside the intensity system as a secondary trigger:
 
-- **Lower (50-100)**: Earlier entries, more trades
-- **Standard (200)**: Balanced approach
-- **Higher (300-500)**: Later entries, fewer trades, higher quality
+- **Lower (1-2)**: Very quick entries, relies more on intensity
+- **Standard (3)**: Balanced dual-trigger approach (recommended)
+- **Higher (5-10)**: More conservative, requires both triggers
+
+**Note**: The intensity system (≥10.0) can trigger buys even faster than the counter.
 
 ## Best Practices
 

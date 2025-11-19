@@ -10,6 +10,8 @@ A professional, production-ready cryptocurrency trading bot for Binance that use
 
 ### 🎯 Core Features
 - **RSI-Based Trading Strategy**: Automated buy/sell decisions based on RSI indicators
+- **Oversold Intensity System**: Advanced signal detection based on RSI depth and duration
+- **Adaptive Time-Based Exits**: Smart sell timing that adjusts to price trends
 - **Advanced Risk Management**: Multiple stop-loss and take-profit strategies
 - **Real-Time Monitoring**: Live dashboard for tracking bot performance
 - **Simulation Mode**: Test strategies without risking real funds
@@ -19,6 +21,7 @@ A professional, production-ready cryptocurrency trading bot for Binance that use
 
 ### 📊 Dashboard Features
 - **Live Price & RSI Monitoring**
+- **Oversold Intensity Tracking**: Real-time signal strength visualization
 - **Current Position Tracking**
 - **P&L Visualization**
 - **Trading Statistics**
@@ -80,7 +83,7 @@ RSI-BINANCE-BOT/
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/RSI-BINANCE-BOT.git
+git clone https://github.com/charlesbx/RSI-BINANCE-BOT.git
 cd RSI-BINANCE-BOT
 ```
 
@@ -188,6 +191,11 @@ The dashboard automatically starts when you run the bot. Access it at:
 http://localhost:5000
 ```
 
+For remote access (e.g., Raspberry Pi deployment):
+```
+http://YOUR_PI_IP:5000
+```
+
 Or open the HTML file directly:
 
 ```bash
@@ -212,11 +220,14 @@ start dashboard/frontend/index.html  # Windows
 The bot uses a sophisticated RSI-based strategy with multiple entry and exit conditions:
 
 #### Buy Signals
-- **Primary**: RSI drops below oversold threshold (default: 30)
-- **Confirmation**: RSI bounces back by 5 points
-- **Counter**: Must stay oversold for 200 cycles
-- **Price**: Current price near lowest price or below 0.75% of highest price
-- **Timing**: Minimum 10 minutes after previous sell
+- **Oversold Intensity System**: Accumulates signal strength based on:
+  - RSI depth below 30 (deeper = stronger)
+  - Duration in oversold zone (longer = stronger)
+  - 5-minute+ duration bonus for persistent signals
+- **Dual Trigger**: Buy when intensity ≥ 10.0 OR counter ≥ 3 cycles
+- **RSI Bounce**: Confirms exit from oversold (RSI + 3 points)
+- **Price Validation**: Near lowest or below 0.75% of highest price
+- **Timing**: Minimum 5 minutes after previous sell
 
 #### Sell Signals (Multiple Strategies)
 
@@ -229,11 +240,12 @@ The bot uses a sophisticated RSI-based strategy with multiple entry and exit con
    - Price rises 3% or more
    - Immediate sell regardless of RSI
 
-3. **Loss Prevention** (Time-based)
-   - **1 hour + (-0.5% loss)**: Sell at buy price +0.15%
-   - **2 hours + (-1.0% loss)**: Sell at -0.75% loss
-   - **3 hours + (-2.0% loss)**: Aggressive sell mode
-   - **6 hours**: Emergency exit
+3. **Adaptive Loss Prevention** (Time-based)
+   - **30 min + (-0.5% loss)**: Sell at buy price +0.15%
+   - **1.5 hours + (-1.0% loss)**: Sell at -0.75% loss
+   - **2.5 hours + (-2.0% loss)**: Progressive sell (-1%, -1.5%, -2%)
+   - **4 hours maximum**: Emergency exit with any loss
+   - **Adaptive Thresholds**: Activates 30% faster if price deteriorating, 30% slower if recovering
 
 ### Risk Management
 
@@ -354,6 +366,34 @@ Logs are stored in `logs/trading_bot.log` and include:
 - **WARNING**: Important warnings (e.g., sell flags activated)
 - **ERROR**: Errors that need attention
 
+## 🍓 Raspberry Pi Deployment
+
+For 24/7 operation, deploy the bot on a Raspberry Pi:
+
+```bash
+# 1. Clone repository on Raspberry Pi
+git clone https://github.com/charlesbx/RSI-BINANCE-BOT.git
+cd RSI-BINANCE-BOT
+
+# 2. Run automated setup
+chmod +x deployment/raspberry_pi_setup.sh
+./deployment/raspberry_pi_setup.sh
+
+# 3. Configure environment
+cp .env.example .env
+nano .env  # Edit with your credentials
+
+# 4. Start bot as systemd service
+sudo systemctl start rsi-bot
+sudo systemctl enable rsi-bot  # Auto-start on boot
+
+# 5. Monitor
+sudo systemctl status rsi-bot
+tail -f logs/bot.log
+```
+
+See [deployment/RASPBERRY_PI.md](deployment/RASPBERRY_PI.md) for complete instructions.
+
 ## 🧪 Testing
 
 Run tests with:
@@ -399,15 +439,15 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/RSI-BINANCE-BOT/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/RSI-BINANCE-BOT/discussions)
-- **Email**: your.email@example.com
+- **Issues**: [GitHub Issues](https://github.com/charlesbx/RSI-BINANCE-BOT/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/charlesbx/RSI-BINANCE-BOT/discussions)
 
 ## 🙏 Acknowledgments
 
 - [python-binance](https://github.com/sammchardy/python-binance) - Binance API wrapper
-- [TA-Lib](https://github.com/mrjbq7/ta-lib) - Technical analysis library
+- [pandas](https://pandas.pydata.org/) - Data analysis and RSI calculation
 - [Flask](https://flask.palletsprojects.com/) - Web framework
+- [Flask-SocketIO](https://flask-socketio.readthedocs.io/) - Real-time dashboard updates
 
 ## 🗺️ Roadmap
 
