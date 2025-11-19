@@ -2,6 +2,10 @@
 
 ## Quick Start Testing
 
+This guide covers testing for both **Spot** and **Futures** trading modes.
+
+📖 **For Futures-specific setup, see [Futures Trading Guide](FUTURES_GUIDE.md)**
+
 ### 1. Interactive Test Menu (Recommended)
 
 The easiest way to test the bot:
@@ -110,14 +114,32 @@ Win Rate:        100.0%
 
 Tests with real Binance data but doesn't place real orders:
 
+**Spot Trading Simulation:**
 ```bash
 # Configure .env first
 nano .env
 
-# Set SIMULATION_MODE=true
+# Set SIMULATION_MODE=true, TRADING_MODE=spot
 # Add your API keys
 
 # Run simulation
+python main.py --symbol ETHUSDT --balance 1000 --simulate
+```
+
+**Futures Trading Simulation (Recommended for Futures testing):**
+```bash
+# Configure .env
+nano .env
+
+# Set these in .env:
+# SIMULATION_MODE=true
+# TRADING_MODE=futures
+# DEFAULT_LEVERAGE=5
+# MARGIN_TYPE=isolated
+# MAX_RISK_PER_TRADE_PCT=2.0
+# MAX_DRAWDOWN_PCT=10.0
+
+# Run Futures simulation
 python main.py --symbol ETHUSDT --balance 1000 --simulate
 ```
 
@@ -127,6 +149,7 @@ python main.py --symbol ETHUSDT --balance 1000 --simulate
 - WebSocket data stream
 - Complete bot workflow
 - Error handling with real data
+- **Futures mode**: Leverage calculations, risk validation, drawdown monitoring
 
 ### 4. Live Trading (Real Money ⚠️)
 
@@ -173,9 +196,12 @@ python test_demo.py --iterations 200 --speed 0.2
 
 ### Scenario 3: Pre-Production Testing (1-2 weeks)
 
+**Spot Trading:**
 ```bash
 # 1. Configure API keys in .env
 nano .env
+
+# Set: TRADING_MODE=spot, SIMULATION_MODE=true
 
 # 2. Run simulation mode
 python main.py --interactive
@@ -189,7 +215,38 @@ tail -f logs/trading_bot.log
 ls -lh data/reports/
 ```
 
-**Expected:** Profitable over extended period with real data
+**Futures Trading (CRITICAL - Extended Testing Required):**
+```bash
+# 1. Configure Futures settings in .env
+nano .env
+
+# Set these carefully:
+# TRADING_MODE=futures
+# SIMULATION_MODE=true  # ALWAYS start with simulation!
+# DEFAULT_LEVERAGE=3     # Start VERY conservative
+# MARGIN_TYPE=isolated
+# MAX_RISK_PER_TRADE_PCT=1.0  # Low risk for testing
+# MAX_DRAWDOWN_PCT=8.0
+
+# 2. Run simulation for 2-4 weeks (longer than Spot!)
+python main.py --symbol ETHUSDT --balance 1000 --simulate
+
+# 3. Monitor risk metrics in logs
+grep "RISK STATUS" logs/trading_bot.log
+
+# 4. Verify drawdown protection
+grep "drawdown" logs/trading_bot.log
+
+# 5. Check position sizing
+grep "Position Sizing" logs/trading_bot.log
+
+# 6. Review leverage performance
+# Win rate should be >60% for profitable leverage trading
+```
+
+**Expected:** 
+- Profitable over extended period with real data
+- **Futures**: Drawdown stays well below limit, risk validation working, no near-liquidations
 
 ---
 
@@ -203,11 +260,23 @@ ls -lh data/reports/
 - ✅ Average P&L: > 0
 - ✅ Max Loss: < 2% per trade
 
+**Good Futures Strategy Indicators (Additional):**
+- ✅ Win Rate: > 60% (higher threshold due to leverage)
+- ✅ Max Drawdown: < 5% (well below limit)
+- ✅ Risk validation: All trades pass validation
+- ✅ No liquidation warnings
+
 **Warning Signs:**
 - ⚠️ Win Rate: < 40%
 - ⚠️ Total Return: Negative
 - ⚠️ Large consecutive losses
 - ⚠️ Very few trades (RSI too restrictive)
+
+**Futures-Specific Warning Signs:**
+- 🚨 Drawdown approaching max limit
+- 🚨 Frequent trade blocks due to risk limits
+- 🚨 Liquidation price too close to entry
+- 🚨 Win rate < 50% (leverage amplifies losses)
 
 **Adjustment Tips:**
 
@@ -360,16 +429,27 @@ Areas not covered:
 
 These require integration testing or manual testing in simulation mode.
 
-## Next Steps
+## Testing Checklist
 
-After successful testing:
-
-1. ✅ All unit tests pass
+### Before Going Live - Spot Trading
+1. ✅ All unit tests pass (`pytest tests/`)
 2. ✅ Demo shows profitable results
 3. ✅ Simulation runs for 1+ week successfully
-4. → **Consider live trading with small amounts**
-5. → **Monitor closely and scale gradually**
+4. ✅ Win rate > 60%
+5. ✅ Understand strategy logic
+6. → **Ready for live Spot trading with small amounts**
 
----
+### Before Going Live - Futures Trading
+1. ✅ All unit tests pass (`pytest tests/`)
+2. ✅ Demo shows profitable results
+3. ✅ **Simulation runs for 2-4 weeks successfully** (longer than Spot!)
+4. ✅ **Win rate > 60%** (critical with leverage)
+5. ✅ **Drawdown stays < 5-8%** (well below limit)
+6. ✅ **Understand leverage mechanics completely**
+7. ✅ **Read and understand [Futures Trading Guide](FUTURES_GUIDE.md)**
+8. ✅ **Start with 2-5x leverage maximum**
+9. ✅ **Use isolated margin mode**
+10. ✅ **Test with 10% of intended capital first**
+11. → **Ready for live Futures trading with extreme caution**
 
-**Remember:** Testing is crucial. Never skip straight to live trading!
+**⚠️ CRITICAL**: Futures trading is high-risk. Only proceed if ALL checklist items pass and you fully understand leverage risks.

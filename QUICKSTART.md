@@ -2,6 +2,12 @@
 
 Get your RSI Trading Bot up and running in 5 minutes!
 
+**Choose Your Trading Mode:**
+- **Spot Trading** (default): Traditional buy and hold
+- **Futures Trading**: Leverage trading with advanced risk management
+
+📖 **For detailed Futures setup, see [Futures Trading Guide](docs/FUTURES_GUIDE.md)**
+
 ## ⚡ Super Quick Start
 
 ```bash
@@ -47,9 +53,13 @@ cd RSI-BINANCE-BOT
 1. Go to [Binance.com](https://www.binance.com/) → Login
 2. Navigate to: Profile → API Management
 3. Create new API Key
-4. ✅ Enable: "Read Info" and "Enable Trading"
-5. ❌ Disable: "Enable Withdrawals" (for safety!)
-6. Copy API Key and Secret
+4. **For Spot Trading:**
+   - ✅ Enable: "Read Info" and "Enable Trading"
+5. **For Futures Trading:**
+   - ✅ Enable: "Read Info" and "Enable Futures"
+   - 📖 See [Futures Trading Guide](docs/FUTURES_GUIDE.md) for detailed setup
+6. ❌ Disable: "Enable Withdrawals" (for safety!)
+7. Copy API Key and Secret
 
 **Configure .env file:**
 
@@ -58,13 +68,30 @@ cd RSI-BINANCE-BOT
 nano .env
 ```
 
-Add your credentials:
+**For Spot Trading (default):**
 
 ```env
 BINANCE_API_KEY=your_api_key_here
 BINANCE_API_SECRET=your_api_secret_here
+TRADING_MODE=spot
 SIMULATION_MODE=true
 ```
+
+**For Futures Trading (with leverage):**
+
+```env
+BINANCE_API_KEY=your_api_key_here
+BINANCE_API_SECRET=your_api_secret_here
+TRADING_MODE=futures
+DEFAULT_LEVERAGE=5  # Start with 2-5x
+MARGIN_TYPE=isolated
+MAX_RISK_PER_TRADE_PCT=2.0
+MAX_DRAWDOWN_PCT=10.0
+DYNAMIC_POSITION_SIZING=true
+SIMULATION_MODE=true
+```
+
+⚠️ **IMPORTANT for Futures**: Always start with `SIMULATION_MODE=true` and low leverage!
 
 ### Step 3: Run Bot (1 minute)
 
@@ -97,7 +124,7 @@ open dashboard/frontend/index.html
 
 ## 🎯 Common Use Cases
 
-### 1. Test Strategy (Simulation)
+### 1. Test Strategy (Simulation - Spot)
 
 ```bash
 python main.py \
@@ -109,10 +136,27 @@ python main.py \
   --simulate
 ```
 
-### 2. Live Trading (Real Money)
+### 2. Test Futures Strategy (Simulation - RECOMMENDED)
+
+```bash
+# First, set in .env:
+# TRADING_MODE=futures
+# DEFAULT_LEVERAGE=3
+# MARGIN_TYPE=isolated
+# MAX_RISK_PER_TRADE_PCT=1.0
+# MAX_DRAWDOWN_PCT=8.0
+
+python main.py \
+  --symbol ETHUSDT \
+  --balance 1000 \
+  --simulate
+```
+
+### 3. Live Trading (Real Money)
 
 ⚠️ **CAUTION**: Use at your own risk!
 
+**Spot Trading:**
 ```bash
 python main.py \
   --symbol ETHUSDT \
@@ -120,7 +164,20 @@ python main.py \
   --live
 ```
 
-### 3. Conservative Strategy
+**Futures Trading:**
+```bash
+# ⚠️ HIGH RISK - Only after extensive simulation testing!
+# Ensure .env has: TRADING_MODE=futures and proper risk settings
+
+python main.py \
+  --symbol ETHUSDT \
+  --balance 500 \
+  --live
+```
+
+📖 **Read [Futures Trading Guide](docs/FUTURES_GUIDE.md) before live Futures trading!**
+
+### 4. Conservative Strategy
 
 ```bash
 python main.py \
@@ -234,22 +291,26 @@ python main.py --help
 **Day 1-2: Learn**
 - Read [README.md](README.md)
 - Understand [STRATEGY.md](docs/STRATEGY.md)
+- **If using Futures**: Read [Futures Trading Guide](docs/FUTURES_GUIDE.md)
 - Review dashboard
 
-**Day 3-7: Test**
-- Run in simulation for 1 week
+**Day 3-7: Test (Spot) / Day 3-21: Test (Futures)**
+- Run in simulation for 1 week (Spot) or 2-4 weeks (Futures)
 - Try different parameters
+- Monitor risk metrics (especially for Futures)
 - Analyze results
 
-**Week 2: Optimize**
+**Week 2: Optimize (Spot) / Week 4: Optimize (Futures)**
 - Adjust RSI thresholds
 - Test different symbols
 - Review win rate
+- **Futures**: Fine-tune leverage and risk parameters
 
-**Week 3+: Go Live**
-- Start with small amounts
+**Week 3+: Go Live (Spot) / Week 5+: Go Live (Futures)**
+- Start with small amounts (10% of intended capital)
 - Monitor closely
 - Scale up gradually
+- **Futures**: Start with 2-5x leverage maximum
 
 ## ❓ Troubleshooting
 
@@ -293,7 +354,9 @@ python -c "from config.settings import AppConfig; AppConfig().initialize()"
    - [README.md](README.md) - Complete guide
    - [INSTALLATION.md](docs/INSTALLATION.md) - Detailed setup
    - [STRATEGY.md](docs/STRATEGY.md) - Strategy deep dive
+   - **[FUTURES_GUIDE.md](docs/FUTURES_GUIDE.md)** - Futures trading guide
    - [API.md](docs/API.md) - API documentation
+   - [TESTING.md](docs/TESTING.md) - Testing guide
 
 2. **Join Community**
    - GitHub Discussions
@@ -314,6 +377,7 @@ python -c "from config.settings import AppConfig; AppConfig().initialize()"
 - Monitor bot regularly
 - Keep API keys secret
 - Use small amounts initially
+- **Futures**: Start with low leverage (2-5x) and isolated margin
 
 ❌ **DON'T:**
 - Share API keys
@@ -321,6 +385,8 @@ python -c "from config.settings import AppConfig; AppConfig().initialize()"
 - Invest more than you can afford to lose
 - Run unmonitored in live mode
 - Commit .env file to git
+- **Futures**: Use high leverage without extensive testing
+- **Futures**: Use cross margin mode as a beginner
 
 ## 📞 Getting Help
 

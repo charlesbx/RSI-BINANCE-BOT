@@ -51,6 +51,18 @@ Or use the binary package:
 pip install talib-binary
 ```
 
+#### Binance Account Setup
+
+For **Spot Trading**:
+- Standard Binance account
+- API keys with "Enable Spot & Margin Trading" permission
+
+For **Futures Trading** (leverage):
+- Enable Futures trading on your Binance account
+- Complete KYC verification
+- API keys with "Enable Futures" permission
+- See **[Futures Trading Guide](FUTURES_GUIDE.md)** for detailed setup
+
 **macOS:**
 ```bash
 brew install ta-lib
@@ -112,7 +124,11 @@ This script will:
    - Go to [Binance](https://www.binance.com/)
    - Login → API Management
    - Create API Key
-   - Enable "Read Info" and "Enable Spot & Margin Trading"
+   - **For Spot Trading:**
+     - Enable "Read Info" and "Enable Spot & Margin Trading"
+   - **For Futures Trading:**
+     - Enable "Read Info" and "Enable Futures"
+     - See **[Futures Trading Guide](FUTURES_GUIDE.md)** for complete setup
    - **Disable** "Enable Withdrawals" for safety
    - Save your API Key and Secret
 
@@ -121,10 +137,15 @@ This script will:
    - Generate App Password: [https://myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
 
 3. **Edit `.env` file**
+
+   **For Spot Trading (default):**
    ```env
    # Binance API
    BINANCE_API_KEY=your_api_key_here
    BINANCE_API_SECRET=your_api_secret_here
+   
+   # Trading Mode
+   TRADING_MODE=spot
    
    # Email Notifications
    SMTP_EMAIL=your_email@gmail.com
@@ -134,6 +155,33 @@ This script will:
    # Bot Configuration
    SIMULATION_MODE=true
    ```
+
+   **For Futures Trading (with leverage):**
+   ```env
+   # Binance API
+   BINANCE_API_KEY=your_api_key_here
+   BINANCE_API_SECRET=your_api_secret_here
+   
+   # Trading Mode
+   TRADING_MODE=futures
+   
+   # Futures Configuration
+   DEFAULT_LEVERAGE=5  # Start with 2-5x leverage
+   MARGIN_TYPE=isolated  # isolated or cross
+   MAX_RISK_PER_TRADE_PCT=2.0
+   MAX_DRAWDOWN_PCT=10.0
+   DYNAMIC_POSITION_SIZING=true
+   
+   # Email Notifications
+   SMTP_EMAIL=your_email@gmail.com
+   SMTP_PASSWORD=your_16_char_app_password
+   NOTIFICATION_EMAIL=destination@gmail.com
+   
+   # Bot Configuration
+   SIMULATION_MODE=true
+   ```
+
+   📖 **See [Futures Trading Guide](FUTURES_GUIDE.md) for detailed configuration and safety tips**
 
 ### 5. Test Installation
 
@@ -268,7 +316,10 @@ python main.py --symbol ETHUSDT --balance 100 --simulate
 
 ## Next Steps
 
-1. **Read the Documentation**: Check `README.md` for usage instructions
+1. **Read the Documentation**: 
+   - Check `README.md` for usage instructions
+   - **[Futures Trading Guide](FUTURES_GUIDE.md)** if using leverage
+   - [Strategy Guide](STRATEGY.md) for trading strategy details
 2. **Test in Simulation**: Always test strategies in simulation mode first
 3. **Start Small**: When going live, start with small amounts
 4. **Monitor Logs**: Check `logs/trading_bot.log` regularly
