@@ -770,7 +770,9 @@ class TradingBot:
             'stats': self.stats.to_dict(),
             'strategy_status': self.strategy.get_status_message(self.position, self.current_rsi),
             'oversold_intensity': round(self.strategy.oversold_intensity, 2),
-            'oversold_counter': self.strategy.oversold_counter
+            'oversold_counter': self.strategy.oversold_counter,
+            'overbought_intensity': round(self.strategy.overbought_intensity, 2),
+            'overbought_counter': self.strategy.overbought_counter
         }
         
         # Add Futures-specific information
