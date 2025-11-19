@@ -225,55 +225,87 @@ class RSIStrategy:
         time_held = datetime.now() - position.entry_time
         hours_held = time_held.total_seconds() / 3600
         
-        # === LOSS PREVENTION STRATEGIES ===
+        # === ADAPTIVE LOSS PREVENTION STRATEGIES ===
         
-        # Activate sell flags based on time and loss
+        # Calculate trend: is price recovering or deteriorating?
+        price_trend = "neutral"
+        if hasattr(position, 'entry_price'):
+            recent_change = (current_price - position.entry_price) / position.entry_price * 100
+            if recent_change > -0.3:
+                price_trend = "recovering"
+            elif recent_change < -1.5:
+                price_trend = "deteriorating"
+        
+        # Activate sell flags based on time, loss, and trend
         loss_0_5_pct = calculate_percentage(0.5, position.entry_price)
         loss_1_0_pct = calculate_percentage(1.0, position.entry_price)
         loss_2_0_pct = calculate_percentage(2.0, position.entry_price)
         
-        # Sell at buy price after 1 hour with -0.5% loss
+        # Mode 1: Sell at buy price (early warning)
+        # Activate earlier if deteriorating, later if recovering
+        threshold_0_5 = self.config.trading.SELL_AT_LOSS_0_5_HOURS
+        if price_trend == "deteriorating":
+            threshold_0_5 *= 0.7  # 30% faster activation
+        elif price_trend == "recovering":
+            threshold_0_5 *= 1.3  # 30% slower activation
+            
         if (not self.sell_at_buyprice and 
             current_price <= position.entry_price - loss_0_5_pct and 
-            hours_held >= self.config.trading.SELL_AT_LOSS_0_5_HOURS):
+            hours_held >= threshold_0_5):
             self.sell_at_buyprice = True
-            self.logger.warning(f"⚠ Activated: Sell at buy price mode (held {hours_held:.1f}h)")
+            self.logger.warning(f"⚠ Activated: Sell at buy price mode (held {hours_held:.1f}h, trend: {price_trend})")
         
-        # Sell fast after 2 hours with -1% loss
+        # Mode 2: Fast sell (moderate urgency)
+        threshold_1_0 = self.config.trading.SELL_AT_LOSS_1_0_HOURS
+        if price_trend == "deteriorating":
+            threshold_1_0 *= 0.75
+        elif price_trend == "recovering":
+            threshold_1_0 *= 1.2
+            
         if (not self.sell_fast and 
             current_price <= position.entry_price - loss_1_0_pct and 
-            hours_held >= self.config.trading.SELL_AT_LOSS_1_0_HOURS):
+            hours_held >= threshold_1_0):
             self.sell_fast = True
-            self.logger.warning(f"⚠ Activated: Fast sell mode (held {hours_held:.1f}h)")
+            self.logger.warning(f"⚠ Activated: Fast sell mode (held {hours_held:.1f}h, trend: {price_trend})")
         
-        # Sell very fast after 3 hours with -2% loss
+        # Mode 3: Very fast sell (high urgency)
+        threshold_2_0 = self.config.trading.SELL_AT_LOSS_2_0_HOURS
+        if price_trend == "deteriorating":
+            threshold_2_0 *= 0.8
+            
         if (not self.sell_very_fast and 
             current_price <= position.entry_price - loss_2_0_pct and 
-            hours_held >= self.config.trading.SELL_AT_LOSS_2_0_HOURS):
+            hours_held >= threshold_2_0):
             self.sell_very_fast = True
             self.sell_very_fast_time = datetime.now()
             self.very_fast_lose_amt = 1.0
-            self.logger.error(f"🚨 Activated: VERY FAST sell mode (held {hours_held:.1f}h)")
+            self.logger.error(f"🚨 Activated: VERY FAST sell mode (held {hours_held:.1f}h, trend: {price_trend})")
         
         # Progressive loss thresholds in very fast mode
         if self.sell_very_fast and self.sell_very_fast_time:
             vf_hours = (datetime.now() - self.sell_very_fast_time).total_seconds() / 3600
-            if vf_hours >= 1:
+            if vf_hours >= 0.5:
                 self.very_fast_lose_amt = 1.5
-            if vf_hours >= 2:
+            if vf_hours >= 1.0:
                 self.very_fast_lose_amt = 2.0
-            if vf_hours >= 3:
-                self.very_fast_lose_amt = 8.0  # Emergency exit
+            if vf_hours >= 1.5:
+                self.very_fast_lose_amt = 3.0  # Aggressive exit
         
-        # Emergency sell - held too long with big loss
-        if (self.sell_very_fast and 
-            hours_held >= 6 and 
-            current_rsi > self.rsi_overbought and 
-            current_rsi > self.highest_rsi - 3):
-            self.logger.error(f"🚨 EMERGENCY SELL: Held {hours_held:.1f}h with {position.unrealized_pnl_percentage:.2f}% loss")
-            self._reset_sell_flags()
-            self.last_sell_time = datetime.now()
-            return True, f"Emergency exit (held {hours_held:.1f}h)", "loss"
+        # Emergency sell - held too long regardless of RSI
+        max_hold = self.config.trading.MAX_HOLD_HOURS
+        if hours_held >= max_hold:
+            # Force sell if held max time with any loss
+            if position.unrealized_pnl < 0:
+                self.logger.error(f"🚨 MAX HOLD TIME: Selling at {position.unrealized_pnl_percentage:.2f}% after {hours_held:.1f}h")
+                self._reset_sell_flags()
+                self.last_sell_time = datetime.now()
+                return True, f"Max hold time exceeded ({hours_held:.1f}h)", "loss"
+            # Or if RSI overbought
+            elif current_rsi > self.rsi_overbought:
+                self.logger.warning(f"⏰ Max hold time + overbought: {position.unrealized_pnl_percentage:.2f}%")
+                self._reset_sell_flags()
+                self.last_sell_time = datetime.now()
+                return True, f"Max hold + RSI overbought", "win" if position.unrealized_pnl > 0 else "neutral"
         
         # Sell with RSI oversold at reduced loss/small profit
         if current_rsi < self.rsi_oversold:

@@ -45,10 +45,11 @@ class TradingConfig:
     MIN_PROFIT_PERCENTAGE: float = 0.75  # Minimum profit to take with RSI
     BIG_PROFIT_PERCENTAGE: float = 3.0  # Big profit target without RSI
     
-    # Time-based sell conditions
-    SELL_AT_LOSS_0_5_HOURS: int = 1  # Sell at -0.5% after 1 hour
-    SELL_AT_LOSS_1_0_HOURS: int = 2  # Sell at -1% after 2 hours
-    SELL_AT_LOSS_2_0_HOURS: int = 3  # Sell at -2% after 3 hours
+    # Time-based sell conditions (more adaptive)
+    SELL_AT_LOSS_0_5_HOURS: float = 0.5  # Sell at -0.5% after 30 min (was 1h)
+    SELL_AT_LOSS_1_0_HOURS: float = 1.5  # Sell at -1% after 1.5h (was 2h)
+    SELL_AT_LOSS_2_0_HOURS: float = 2.5  # Sell at -2% after 2.5h (was 3h)
+    MAX_HOLD_HOURS: float = 4.0  # Maximum hold time before aggressive exit
     
     # Buy conditions
     MIN_RSI_COUNTER: int = 3  # Minimum RSI oversold occurrences before buy
