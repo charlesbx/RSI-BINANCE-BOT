@@ -1,19 +1,18 @@
 """
-Technical indicators calculation using pandas-ta
+Technical indicators calculation
 """
 import pandas as pd
-import pandas_ta as ta
 import numpy as np
 from typing import List, Optional
 
 
 class TechnicalIndicators:
-    """Technical indicators calculator using pandas-ta"""
+    """Technical indicators calculator"""
     
     @staticmethod
     def calculate_rsi(prices: List[float], period: int = 14) -> Optional[float]:
         """
-        Calculate RSI (Relative Strength Index)
+        Calculate RSI (Relative Strength Index) manually
         
         Args:
             prices: List of prices
@@ -26,13 +25,20 @@ class TechnicalIndicators:
             return None
         
         prices_series = pd.Series(prices, dtype=float)
-        rsi_values = ta.rsi(prices_series, length=period)
         
-        if rsi_values is None or rsi_values.empty:
-            return None
+        # Calculate price changes
+        delta = prices_series.diff()
+        
+        # Separate gains and losses
+        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+        
+        # Calculate RS and RSI
+        rs = gain / loss
+        rsi = 100 - (100 / (1 + rs))
         
         # Return the last RSI value
-        last_rsi = rsi_values.iloc[-1]
+        last_rsi = rsi.iloc[-1]
         return float(last_rsi) if not pd.isna(last_rsi) else None
     
     @staticmethod
