@@ -4,9 +4,21 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-A professional, production-ready cryptocurrency trading bot for Binance that uses RSI (Relative Strength Index) strategy with advanced risk management and real-time monitoring.
+A professional, production-ready cryptocurrency trading bot for Binance that uses RSI (Relative Strength Index) strategy with advanced risk management, real-time monitoring, and **full Binance Futures support with leverage**.
 
 ## ✨ Features
+
+### 🚀 NEW: Futures Trading with Leverage
+- **Binance Futures Support**: Trade with leverage (1x - 125x)
+- **Isolated & Cross Margin**: Choose your margin mode
+- **Dynamic Position Sizing**: Risk-based position calculation
+- **Drawdown Protection**: Automatic trading halt at loss limits
+- **Risk Management System**: Validate every trade before execution
+- **Leverage Configuration**: Per-symbol leverage settings
+- **Long & Short Positions**: Full directional trading support
+- **Backward Compatible**: Spot trading works as before
+
+👉 **[Read the Futures Trading Guide](docs/FUTURES_GUIDE.md)** for setup and safety tips
 
 ### 🎯 Core Features
 - **RSI-Based Trading Strategy**: Automated buy/sell decisions based on RSI indicators
@@ -26,10 +38,13 @@ A professional, production-ready cryptocurrency trading bot for Binance that use
 - **P&L Visualization**
 - **Trading Statistics**
 - **Performance Metrics**
+- **Risk Status Display**: Drawdown, leverage, and risk metrics
 
 ### 🔐 Security & Safety
 - **API Key Protection**: Environment-based configuration
 - **Simulation Mode**: Test without real money
+- **Risk Limits**: Configurable max risk per trade and drawdown limits
+- **Trade Validation**: Every order validated before execution
 - **Error Handling**: Robust error handling and recovery
 - **Logging**: Comprehensive logging for debugging and auditing
 
@@ -39,7 +54,9 @@ A professional, production-ready cryptocurrency trading bot for Binance that use
 RSI-BINANCE-BOT/
 ├── src/                          # Source code
 │   ├── core/                     # Core bot functionality
-│   │   ├── exchange_client.py   # Binance API wrapper
+│   │   ├── exchange_client.py   # Unified Spot/Futures API wrapper
+│   │   ├── futures_executor.py  # Futures-specific operations
+│   │   ├── risk_manager.py      # Risk management & position sizing
 │   │   ├── trading_bot.py       # Main bot orchestrator
 │   │   └── websocket_handler.py # WebSocket handler
 │   ├── strategies/               # Trading strategies
@@ -118,12 +135,17 @@ See [TEST_GUIDE.md](TEST_GUIDE.md) for detailed testing instructions.
 
 ### Configuration
 
+#### Basic Setup (Spot Trading)
+
 Edit the `.env` file with your credentials:
 
 ```env
 # Binance API (Required)
 BINANCE_API_KEY=your_api_key_here
 BINANCE_API_SECRET=your_api_secret_here
+
+# Trading Mode
+TRADING_MODE=spot  # Options: "spot" or "futures"
 
 # Email Notifications (Optional)
 SMTP_EMAIL=your_email@gmail.com
@@ -135,6 +157,28 @@ SIMULATION_MODE=true  # Set to false for real trading
 DEFAULT_TRADE_SYMBOL=ETHUSDT
 DEFAULT_TRADE_QUANTITY=1000
 ```
+
+#### Futures Trading Setup
+
+For Futures trading with leverage, add these settings:
+
+```env
+# Trading Mode
+TRADING_MODE=futures  # Enable Futures trading
+
+# Futures Configuration
+DEFAULT_LEVERAGE=5  # Leverage: 1-125 (start with 2-5x)
+MARGIN_TYPE=isolated  # Options: "isolated" or "cross"
+
+# Risk Management
+MAX_RISK_PER_TRADE_PCT=2.0  # Max % of balance to risk per trade
+MAX_DRAWDOWN_PCT=10.0  # Max drawdown before stopping bot
+DYNAMIC_POSITION_SIZING=true  # Use risk-based position sizing
+```
+
+**⚠️ Important:** Always start with `SIMULATION_MODE=true` and low leverage (2-5x) when testing Futures.
+
+📖 **Read the complete [Futures Trading Guide](docs/FUTURES_GUIDE.md)** for detailed setup instructions, safety tips, and examples.
 
 ## 📖 Usage
 
@@ -149,7 +193,7 @@ This will prompt you for all necessary parameters.
 ### Command Line Mode
 
 ```bash
-# Basic usage with defaults
+# Basic usage with defaults (Spot mode)
 python main.py --symbol ETHUSDT --balance 1000
 
 # With dashboard
@@ -158,7 +202,7 @@ python main.py --symbol ETHUSDT --balance 1000 --dashboard
 # Custom RSI parameters
 python main.py --symbol BTCUSDT --balance 5000 --rsi-period 14 --rsi-overbought 75 --rsi-oversold 25
 
-# Simulation mode (default)
+# Simulation mode (default - always test first!)
 python main.py --symbol ETHUSDT --balance 1000 --simulate
 
 # Live trading (CAUTION: Real money!)
@@ -470,14 +514,26 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🗺️ Roadmap
 
-- [ ] Support for multiple trading pairs
+### ✅ Completed (v2.0)
+- [x] **Binance Futures support with leverage**
+- [x] **Risk management system**
+- [x] **Dynamic position sizing**
+- [x] **Drawdown protection**
+
+### 🔜 Upcoming Features
+- [ ] Support for multiple trading pairs simultaneously
 - [ ] Additional technical indicators (MACD, Bollinger Bands)
-- [ ] Machine learning integration
-- [ ] Telegram bot integration
+- [ ] Hedge mode strategies (simultaneous long/short)
+- [ ] Stop-loss and take-profit order automation
+- [ ] Machine learning integration for signal optimization
+- [ ] Telegram bot integration for mobile alerts
 - [ ] Mobile app
-- [ ] Backtesting framework
-- [ ] Advanced charting
+- [ ] Backtesting framework with historical data
+- [ ] Advanced charting and visualization
+- [ ] Portfolio rebalancing strategies
 
 ---
 
 **Happy Trading! 🚀📈**
+
+**⚠️ Risk Disclaimer:** Cryptocurrency trading, especially with leverage, carries significant risk. This bot is provided for educational purposes. Always test in simulation mode, use proper risk management, and never invest more than you can afford to lose.
