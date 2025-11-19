@@ -384,10 +384,6 @@
             balanceChangeEl.textContent = `${formatCurrency(balanceChange)} (${formatPercentage(balanceChangePct)})`;
             balanceChangeEl.className = balanceChange >= 0 ? 'card-subtitle positive' : 'card-subtitle negative';
 
-            // Total trades
-            document.getElementById('totalTrades').textContent = stats.total_trades || 0;
-            document.getElementById('winRate').textContent = (stats.win_rate || 0).toFixed(1) + '%';
-
             // Position
             const position = data.position;
             const positionContent = document.getElementById('positionContent');
