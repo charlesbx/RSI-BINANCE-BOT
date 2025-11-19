@@ -2,7 +2,9 @@
 
 ## Overview
 
-The RSI Trading Bot provides a REST API and WebSocket interface for real-time monitoring and control.
+The RSI Trading Bot provides a REST API and WebSocket interface for real-time monitoring and control. The API supports both Spot and Futures trading modes.
+
+📖 **For Futures trading setup, see [Futures Trading Guide](FUTURES_GUIDE.md)**
 
 ## Base URL
 
@@ -34,10 +36,13 @@ Get complete bot status including current price, RSI, position, and statistics.
 {
   "is_running": true,
   "is_simulation": true,
+  "trading_mode": "futures",
   "symbol": "ETHUSDT",
   "current_price": 2500.50,
   "current_rsi": 45.32,
   "current_balance": 1050.25,
+  "leverage": 5,
+  "margin_type": "isolated",
   "position": {
     "symbol": "ETHUSDT",
     "quantity": 0.5,
@@ -48,7 +53,17 @@ Get complete bot status including current price, RSI, position, and statistics.
     "current_rsi": 45.32,
     "unrealized_pnl": 25.25,
     "unrealized_pnl_percentage": 2.06,
-    "time_held_minutes": 120.5
+    "time_held_minutes": 120.5,
+    "position_value": 1250.25,
+    "margin_used": 250.05,
+    "liquidation_price": 2000.00
+  },
+  "risk_status": {
+    "current_balance": 1050.25,
+    "peak_balance": 1100.00,
+    "drawdown_pct": 4.52,
+    "max_drawdown_pct": 10.0,
+    "risk_per_trade_pct": 2.0
   },
   "stats": {
     "total_trades": 10,
@@ -70,6 +85,8 @@ Get complete bot status including current price, RSI, position, and statistics.
   "strategy_status": "🔍 Waiting for BUY | RSI: 45.32"
 }
 ```
+
+**Note**: Fields `leverage`, `margin_type`, `risk_status`, and position fields like `position_value`, `margin_used`, `liquidation_price` are only present in Futures trading mode.
 
 ### GET /api/stats
 
@@ -129,13 +146,21 @@ Get bot configuration.
 ```json
 {
   "symbol": "ETHUSDT",
+  "trading_mode": "futures",
   "rsi_period": 14,
   "rsi_overbought": 70,
   "rsi_oversold": 30,
   "simulation_mode": true,
-  "initial_balance": 1000.00
+  "initial_balance": 1000.00,
+  "leverage": 5,
+  "margin_type": "isolated",
+  "max_risk_per_trade_pct": 2.0,
+  "max_drawdown_pct": 10.0,
+  "dynamic_position_sizing": true
 }
 ```
+
+**Note**: Futures-specific fields (`leverage`, `margin_type`, `max_risk_per_trade_pct`, etc.) are only present when `trading_mode` is `"futures"`.
 
 ## WebSocket Events
 
@@ -346,8 +371,45 @@ if __name__ == '__main__':
 
 Planned API enhancements:
 - [ ] Historical trade data endpoint
-- [ ] Configuration update endpoint
+- [ ] Configuration update endpoint (including leverage adjustment)
 - [ ] Manual trade triggering
 - [ ] Strategy parameter adjustment
 - [ ] Multiple timeframe data
 - [ ] Performance metrics graphs
+- [ ] Futures-specific endpoints:
+  - [ ] GET /api/risk_status - Detailed risk metrics
+  - [ ] GET /api/margin_info - Margin usage and liquidation data
+  - [ ] POST /api/leverage - Update leverage dynamically
+  - [ ] GET /api/funding_history - Funding rate history
+
+## Futures Trading Mode
+
+When the bot is running in Futures mode (`TRADING_MODE=futures`), additional data is available through the API:
+
+### Additional Fields in `/api/status`:
+- `trading_mode`: "futures"
+- `leverage`: Current leverage setting
+- `margin_type`: "isolated" or "cross"
+- `risk_status`: Drawdown and risk metrics
+- Position includes: `position_value`, `margin_used`, `liquidation_price`
+
+### Risk Monitoring Example:
+```python
+import requests
+
+response = requests.get('http://localhost:5000/api/status')
+data = response.json()
+
+if data.get('trading_mode') == 'futures':
+    risk = data.get('risk_status', {})
+    print(f"Drawdown: {risk.get('drawdown_pct', 0):.2f}%")
+    print(f"Max Drawdown: {risk.get('max_drawdown_pct', 0)}%")
+    
+    position = data.get('position')
+    if position:
+        print(f"Position Value: ${position['position_value']:.2f}")
+        print(f"Margin Used: ${position['margin_used']:.2f}")
+        print(f"Liquidation Price: ${position.get('liquidation_price', 0):.2f}")
+```
+
+📖 **See [Futures Trading Guide](FUTURES_GUIDE.md) for complete futures documentation**
