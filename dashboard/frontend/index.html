@@ -230,6 +230,13 @@
                 <div class="card-subtitle" id="oversoldStatus">No signal</div>
             </div>
 
+            <!-- Overbought Intensity (NEW) -->
+            <div class="card">
+                <div class="card-title">Overbought Signal</div>
+                <div class="card-value" id="overboughtIntensity">0.0</div>
+                <div class="card-subtitle" id="overboughtStatus">No signal</div>
+            </div>
+
             <!-- Balance -->
             <div class="card">
                 <div class="card-title">Current Balance</div>
@@ -371,6 +378,29 @@
                 oversoldStatusEl.className = 'card-subtitle';
                 oversoldStatusEl.style.fontWeight = 'normal';
             }
+
+                // Overbought Intensity (NEW)
+                const overboughtIntensity = data.overbought_intensity || 0;
+                const overboughtCount = data.overbought_counter || 0;
+                document.getElementById('overboughtIntensity').textContent = overboughtIntensity.toFixed(1);
+                const overboughtStatusEl = document.getElementById('overboughtStatus');
+                if (overboughtIntensity >= 10.0) {
+                    overboughtStatusEl.textContent = '🔥 STRONG SIGNAL';
+                    overboughtStatusEl.className = 'card-subtitle negative';
+                    overboughtStatusEl.style.fontWeight = 'bold';
+                } else if (overboughtIntensity >= 5.0) {
+                    overboughtStatusEl.textContent = `⚡ Building (${overboughtCount}x)`;
+                    overboughtStatusEl.className = 'card-subtitle negative';
+                    overboughtStatusEl.style.fontWeight = 'normal';
+                } else if (overboughtIntensity > 0) {
+                    overboughtStatusEl.textContent = `💤 Fading (${overboughtCount}x)`;
+                    overboughtStatusEl.className = 'card-subtitle';
+                    overboughtStatusEl.style.fontWeight = 'normal';
+                } else {
+                    overboughtStatusEl.textContent = 'No signal';
+                    overboughtStatusEl.className = 'card-subtitle';
+                    overboughtStatusEl.style.fontWeight = 'normal';
+                }
 
             // Balance
             const stats = data.stats || {};
