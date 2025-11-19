@@ -152,6 +152,9 @@ This will prompt you for all necessary parameters.
 # Basic usage with defaults
 python main.py --symbol ETHUSDT --balance 1000
 
+# With dashboard
+python main.py --symbol ETHUSDT --balance 1000 --dashboard
+
 # Custom RSI parameters
 python main.py --symbol BTCUSDT --balance 5000 --rsi-period 14 --rsi-overbought 75 --rsi-oversold 25
 
@@ -159,7 +162,7 @@ python main.py --symbol BTCUSDT --balance 5000 --rsi-period 14 --rsi-overbought 
 python main.py --symbol ETHUSDT --balance 1000 --simulate
 
 # Live trading (CAUTION: Real money!)
-python main.py --symbol ETHUSDT --balance 1000 --live
+python main.py --symbol ETHUSDT --balance 1000 --live --dashboard
 ```
 
 ### Available Options
@@ -175,6 +178,7 @@ Options:
   --simulate            Run in simulation mode
   --live                Run in LIVE mode (real trades)
   --interactive         Interactive mode
+  --dashboard           Launch dashboard server with bot
   --no-email            Disable email notifications
   --log-level LEVEL     Set logging level (DEBUG, INFO, WARNING, ERROR)
 ```
@@ -185,8 +189,23 @@ The bot includes a beautiful web dashboard for real-time monitoring.
 
 ### Starting the Dashboard
 
-The dashboard automatically starts when you run the bot. Access it at:
+The dashboard can be started in two ways:
 
+**Option 1: Launch with bot (recommended)**
+```bash
+python main.py --symbol ETHUSDT --balance 1000 --dashboard
+```
+
+**Option 2: Separate process**
+```bash
+# Terminal 1: Start bot
+python main.py --symbol ETHUSDT --balance 1000
+
+# Terminal 2: Start dashboard
+python run_dashboard.py
+```
+
+Access at:
 ```
 http://localhost:5000
 ```
