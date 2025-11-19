@@ -40,10 +40,22 @@ class TradingConfig:
     TRADE_SYMBOL: str = os.getenv("DEFAULT_TRADE_SYMBOL", "ETHUSDT")
     TRADE_QUANTITY: float = float(os.getenv("DEFAULT_TRADE_QUANTITY", "1000"))
     
+    # Trading mode: "spot" or "futures"
+    TRADING_MODE: str = os.getenv("TRADING_MODE", "spot").lower()
+    
+    # Futures Configuration
+    DEFAULT_LEVERAGE: int = int(os.getenv("DEFAULT_LEVERAGE", "5"))
+    MARGIN_TYPE: str = os.getenv("MARGIN_TYPE", "isolated").lower()  # "isolated" or "cross"
+    
     # Risk management
     MAX_LOSS_PERCENTAGE: float = 2.0  # Maximum loss per trade
     MIN_PROFIT_PERCENTAGE: float = 0.75  # Minimum profit to take with RSI
     BIG_PROFIT_PERCENTAGE: float = 3.0  # Big profit target without RSI
+    
+    # Advanced Risk Management
+    MAX_RISK_PER_TRADE_PCT: float = float(os.getenv("MAX_RISK_PER_TRADE_PCT", "2.0"))
+    MAX_DRAWDOWN_PCT: float = float(os.getenv("MAX_DRAWDOWN_PCT", "10.0"))
+    DYNAMIC_POSITION_SIZING: bool = os.getenv("DYNAMIC_POSITION_SIZING", "true").lower() == "true"
     
     # Time-based sell conditions (more adaptive)
     SELL_AT_LOSS_0_5_HOURS: float = 0.5  # Sell at -0.5% after 30 min (was 1h)
@@ -58,6 +70,32 @@ class TradingConfig:
     
     # Simulation mode
     SIMULATION_MODE: bool = os.getenv("SIMULATION_MODE", "true").lower() == "true"
+    
+    @classmethod
+    def validate_trading_mode(cls) -> tuple[bool, str]:
+        """Validate trading mode configuration"""
+        if cls.TRADING_MODE not in ["spot", "futures"]:
+            return False, f"Invalid TRADING_MODE: {cls.TRADING_MODE}. Must be 'spot' or 'futures'"
+        return True, ""
+    
+    @classmethod
+    def validate_leverage(cls) -> tuple[bool, str]:
+        """Validate leverage configuration"""
+        if cls.TRADING_MODE == "futures":
+            if not (1 <= cls.DEFAULT_LEVERAGE <= 125):
+                return False, f"Invalid leverage: {cls.DEFAULT_LEVERAGE}. Must be between 1 and 125"
+            if cls.MARGIN_TYPE not in ["isolated", "cross"]:
+                return False, f"Invalid margin type: {cls.MARGIN_TYPE}. Must be 'isolated' or 'cross'"
+        return True, ""
+    
+    @classmethod
+    def validate_risk_params(cls) -> tuple[bool, str]:
+        """Validate risk management parameters"""
+        if not (0.1 <= cls.MAX_RISK_PER_TRADE_PCT <= 10.0):
+            return False, f"MAX_RISK_PER_TRADE_PCT must be between 0.1 and 10.0, got {cls.MAX_RISK_PER_TRADE_PCT}"
+        if not (1.0 <= cls.MAX_DRAWDOWN_PCT <= 50.0):
+            return False, f"MAX_DRAWDOWN_PCT must be between 1.0 and 50.0, got {cls.MAX_DRAWDOWN_PCT}"
+        return True, ""
 
 
 # ==================== NOTIFICATION CONFIGURATION ====================
@@ -146,6 +184,21 @@ class AppConfig:
         
         if not cls.notifications.validate():
             errors.append("Email notification configuration incomplete")
+        
+        # Validate trading mode
+        is_valid, error = cls.trading.validate_trading_mode()
+        if not is_valid:
+            errors.append(error)
+        
+        # Validate leverage (if Futures mode)
+        is_valid, error = cls.trading.validate_leverage()
+        if not is_valid:
+            errors.append(error)
+        
+        # Validate risk parameters
+        is_valid, error = cls.trading.validate_risk_params()
+        if not is_valid:
+            errors.append(error)
         
         return len(errors) == 0, errors
     

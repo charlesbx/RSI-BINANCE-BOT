@@ -1,5 +1,6 @@
 """
 Binance Exchange Client Wrapper
+Supports both Spot and Futures trading
 """
 import logging
 from typing import Dict, List, Optional
@@ -13,22 +14,28 @@ from src.models.trading_models import Trade, TradeType, OrderStatus
 
 class BinanceClient:
     """
-    Wrapper for Binance API client with error handling and logging
+    Unified wrapper for Binance Spot and Futures API with error handling and logging.
+    Automatically routes operations based on trading mode.
     """
     
-    def __init__(self, api_key: str, api_secret: str, testnet: bool = False):
+    def __init__(self, api_key: str, api_secret: str, trading_mode: str = "spot", testnet: bool = False):
         """
         Initialize Binance client
         
         Args:
             api_key: Binance API key
             api_secret: Binance API secret
+            trading_mode: "spot" or "futures"
             testnet: Use testnet instead of production
         """
         self.logger = logging.getLogger(__name__)
         self.api_key = api_key
         self.api_secret = api_secret
+        self.trading_mode = trading_mode.lower()
         self.testnet = testnet
+        
+        if self.trading_mode not in ["spot", "futures"]:
+            raise ValueError(f"Invalid trading_mode: {self.trading_mode}. Must be 'spot' or 'futures'")
         
         try:
             self.client = Client(
@@ -36,10 +43,19 @@ class BinanceClient:
                 api_secret=api_secret,
                 tld='com'
             )
-            self.logger.info("✓ Binance client initialized successfully")
+            mode_str = "FUTURES" if self.trading_mode == "futures" else "SPOT"
+            self.logger.info(f"✓ Binance {mode_str} client initialized successfully")
         except Exception as e:
             self.logger.error(f"✗ Failed to initialize Binance client: {e}")
             raise
+    
+    def is_futures(self) -> bool:
+        """Check if trading mode is Futures"""
+        return self.trading_mode == "futures"
+    
+    def is_spot(self) -> bool:
+        """Check if trading mode is Spot"""
+        return self.trading_mode == "spot"
     
     def test_connection(self) -> bool:
         """
@@ -58,7 +74,7 @@ class BinanceClient:
     
     def get_account_balance(self, asset: str) -> Dict:
         """
-        Get account balance for a specific asset
+        Get account balance for a specific asset (works for both Spot and Futures)
         
         Args:
             asset: Asset symbol (e.g., 'BTC', 'ETH', 'USDT')
@@ -67,20 +83,37 @@ class BinanceClient:
             Balance information
         """
         try:
-            balance = self.client.get_asset_balance(asset=asset)
-            return {
-                'asset': asset,
-                'free': float(balance['free']),
-                'locked': float(balance['locked']),
-                'total': float(balance['free']) + float(balance['locked'])
-            }
+            if self.is_futures():
+                # Get Futures account balance
+                account = self.client.futures_account()
+                
+                # Find specific asset balance
+                for balance in account.get('assets', []):
+                    if balance['asset'] == asset:
+                        return {
+                            'asset': asset,
+                            'free': float(balance['availableBalance']),
+                            'locked': float(balance['initialMargin']),
+                            'total': float(balance['walletBalance'])
+                        }
+                
+                return {'asset': asset, 'free': 0.0, 'locked': 0.0, 'total': 0.0}
+            else:
+                # Get Spot balance
+                balance = self.client.get_asset_balance(asset=asset)
+                return {
+                    'asset': asset,
+                    'free': float(balance['free']),
+                    'locked': float(balance['locked']),
+                    'total': float(balance['free']) + float(balance['locked'])
+                }
         except BinanceAPIException as e:
             self.logger.error(f"✗ Failed to get balance for {asset}: {e}")
             return {'asset': asset, 'free': 0.0, 'locked': 0.0, 'total': 0.0}
     
     def get_symbol_info(self, symbol: str) -> Optional[Dict]:
         """
-        Get trading rules and info for a symbol
+        Get trading rules and info for a symbol (works for both Spot and Futures)
         
         Args:
             symbol: Trading pair (e.g., 'ETHUSDT')
@@ -89,7 +122,11 @@ class BinanceClient:
             Symbol information or None if not found
         """
         try:
-            exchange_info = self.client.get_exchange_info()
+            if self.is_futures():
+                exchange_info = self.client.futures_exchange_info()
+            else:
+                exchange_info = self.client.get_exchange_info()
+            
             for s in exchange_info['symbols']:
                 if s['symbol'] == symbol:
                     return s
@@ -125,7 +162,7 @@ class BinanceClient:
     
     def get_klines(self, symbol: str, interval: str, limit: int = 500) -> List[Dict]:
         """
-        Get candlestick/kline data
+        Get candlestick/kline data (works for both Spot and Futures)
         
         Args:
             symbol: Trading pair
@@ -136,11 +173,18 @@ class BinanceClient:
             List of kline data
         """
         try:
-            klines = self.client.get_klines(
-                symbol=symbol,
-                interval=interval,
-                limit=limit
-            )
+            if self.is_futures():
+                klines = self.client.futures_klines(
+                    symbol=symbol,
+                    interval=interval,
+                    limit=limit
+                )
+            else:
+                klines = self.client.get_klines(
+                    symbol=symbol,
+                    interval=interval,
+                    limit=limit
+                )
             
             return [{
                 'open_time': kline[0],
@@ -162,10 +206,11 @@ class BinanceClient:
         order_type: str,
         quantity: float,
         price: Optional[float] = None,
-        time_in_force: str = 'GTC'
+        time_in_force: str = 'GTC',
+        position_side: str = 'BOTH'
     ) -> Optional[Dict]:
         """
-        Create a new order
+        Create a new order (unified for Spot and Futures)
         
         Args:
             symbol: Trading pair
@@ -174,33 +219,61 @@ class BinanceClient:
             quantity: Order quantity
             price: Order price (required for LIMIT orders)
             time_in_force: Time in force (for LIMIT orders)
+            position_side: 'BOTH', 'LONG', or 'SHORT' (Futures only)
             
         Returns:
             Order response or None if failed
         """
         try:
-            if order_type == 'MARKET':
-                order = self.client.create_order(
-                    symbol=symbol,
-                    side=side,
-                    type=order_type,
-                    quantity=quantity
-                )
-            elif order_type == 'LIMIT':
-                if price is None:
-                    raise ValueError("Price is required for LIMIT orders")
-                order = self.client.create_order(
-                    symbol=symbol,
-                    side=side,
-                    type=order_type,
-                    timeInForce=time_in_force,
-                    quantity=quantity,
-                    price=str(price)
-                )
+            if self.is_futures():
+                # Futures order
+                if order_type == 'MARKET':
+                    order = self.client.futures_create_order(
+                        symbol=symbol,
+                        side=side,
+                        type=order_type,
+                        quantity=quantity,
+                        positionSide=position_side
+                    )
+                elif order_type == 'LIMIT':
+                    if price is None:
+                        raise ValueError("Price is required for LIMIT orders")
+                    order = self.client.futures_create_order(
+                        symbol=symbol,
+                        side=side,
+                        type=order_type,
+                        timeInForce=time_in_force,
+                        quantity=quantity,
+                        price=str(price),
+                        positionSide=position_side
+                    )
+                else:
+                    raise ValueError(f"Unsupported order type: {order_type}")
             else:
-                raise ValueError(f"Unsupported order type: {order_type}")
+                # Spot order
+                if order_type == 'MARKET':
+                    order = self.client.create_order(
+                        symbol=symbol,
+                        side=side,
+                        type=order_type,
+                        quantity=quantity
+                    )
+                elif order_type == 'LIMIT':
+                    if price is None:
+                        raise ValueError("Price is required for LIMIT orders")
+                    order = self.client.create_order(
+                        symbol=symbol,
+                        side=side,
+                        type=order_type,
+                        timeInForce=time_in_force,
+                        quantity=quantity,
+                        price=str(price)
+                    )
+                else:
+                    raise ValueError(f"Unsupported order type: {order_type}")
             
-            self.logger.info(f"✓ Order created: {side} {quantity} {symbol} at {order.get('price', 'MARKET')}")
+            mode_str = "Futures" if self.is_futures() else "Spot"
+            self.logger.info(f"✓ {mode_str} order created: {side} {quantity} {symbol} at {order.get('price', 'MARKET')}")
             return order
             
         except (BinanceAPIException, BinanceOrderException) as e:

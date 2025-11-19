@@ -1,5 +1,6 @@
 """
 Main Trading Bot Implementation
+Supports both Spot and Futures trading with leverage and risk management
 """
 import logging
 import time
@@ -9,6 +10,8 @@ import uuid
 
 from config.settings import AppConfig
 from src.core.exchange_client import BinanceClient
+from src.core.risk_manager import RiskManager
+from src.core.futures_executor import FuturesExecutor
 from src.core.websocket_handler import WebSocketHandler
 from src.strategies.rsi_strategy import RSIStrategy
 from src.indicators.technical_indicators import TechnicalIndicators
@@ -23,6 +26,7 @@ from src.utils.helpers import format_currency, format_percentage
 class TradingBot:
     """
     Main Trading Bot - Orchestrates all components
+    Supports both Spot and Futures trading with full risk management
     """
     
     def __init__(self, config: AppConfig, symbol: str, initial_balance: float):
@@ -38,6 +42,11 @@ class TradingBot:
         self.config = config
         self.symbol = symbol.upper()
         self.initial_balance = initial_balance
+        
+        # Trading mode
+        self.trading_mode = config.trading.TRADING_MODE
+        self.is_futures = self.trading_mode == "futures"
+        self.leverage = config.trading.DEFAULT_LEVERAGE if self.is_futures else 1
         
         # Trading state
         self.current_balance = initial_balance
@@ -56,8 +65,17 @@ class TradingBot:
         self.exchange = BinanceClient(
             api_key=config.binance.API_KEY,
             api_secret=config.binance.API_SECRET,
+            trading_mode=self.trading_mode,
             testnet=config.binance.TESTNET
         )
+        
+        # Initialize Futures executor if needed
+        self.futures_executor: Optional[FuturesExecutor] = None
+        if self.is_futures:
+            self.futures_executor = FuturesExecutor(self.exchange.client, config)
+        
+        # Initialize Risk Manager
+        self.risk_manager = RiskManager(config, initial_balance)
         
         self.strategy = RSIStrategy(config)
         self.indicators = TechnicalIndicators()
@@ -77,19 +95,39 @@ class TradingBot:
         self.is_simulation = config.trading.SIMULATION_MODE
         self.last_candle_closed = False
         
-        self.logger.info(f"{'🎮 SIMULATION' if self.is_simulation else '💰 LIVE'} Trading Bot initialized")
+        mode_emoji = "🎮" if self.is_simulation else "💰"
+        mode_type = "FUTURES" if self.is_futures else "SPOT"
+        self.logger.info(f"{mode_emoji} {mode_type} Trading Bot initialized")
         self.logger.info(f"Symbol: {self.symbol} | Initial Balance: {format_currency(initial_balance)}")
+        if self.is_futures:
+            self.logger.info(f"Leverage: {self.leverage}x | Margin: {config.trading.MARGIN_TYPE}")
     
     def start(self):
         """Start the trading bot"""
         self.logger.info("=" * 60)
-        self.logger.info("🚀 STARTING RSI TRADING BOT")
+        mode_type = "FUTURES" if self.is_futures else "SPOT"
+        self.logger.info(f"🚀 STARTING RSI {mode_type} TRADING BOT")
         self.logger.info("=" * 60)
         
         # Test exchange connection
         if not self.exchange.test_connection():
             self.logger.error("❌ Failed to connect to exchange")
             return False
+        
+        # Setup Futures if needed
+        if self.is_futures and self.futures_executor:
+            self.logger.info(f"⚙️ Configuring Futures for {self.symbol}...")
+            
+            # Set leverage
+            if not self.futures_executor.set_leverage(self.symbol, self.leverage):
+                self.logger.error("❌ Failed to set leverage")
+                return False
+            
+            # Set margin type
+            if not self.futures_executor.set_margin_type(self.symbol):
+                self.logger.warning("⚠️ Failed to set margin type (may already be set)")
+            
+            self.logger.info(f"✓ Futures configured: {self.leverage}x leverage, {self.config.trading.MARGIN_TYPE} margin")
         
         # Get initial market data
         self._initialize_market_data()
@@ -250,18 +288,40 @@ class TradingBot:
     
     def _execute_buy(self, price: float, reason: str):
         """
-        Execute a buy order
+        Execute a buy order with risk management
         
         Args:
             price: Buy price
             reason: Buy reason
         """
-        quantity = self.current_balance / price
+        # Calculate position size with risk management
+        quantity, sizing_details = self.risk_manager.calculate_position_size(
+            current_balance=self.current_balance,
+            entry_price=price,
+            stop_loss_price=None,  # Can be enhanced with actual stop loss
+            leverage=self.leverage
+        )
+        
+        # Validate trade against risk rules
+        is_valid, validation_msg = self.risk_manager.validate_trade(
+            current_balance=self.current_balance,
+            position_size=quantity,
+            entry_price=price,
+            stats=self.stats
+        )
+        
+        if not is_valid:
+            self.logger.error(validation_msg)
+            return
         
         self.logger.info("=" * 60)
         self.logger.info(f"🟢 BUY SIGNAL: {reason}")
         self.logger.info(f"Price: {format_currency(price)} | Quantity: {quantity:.6f}")
         self.logger.info(f"RSI: {self.current_rsi:.2f}")
+        if self.is_futures:
+            self.logger.info(f"Leverage: {self.leverage}x | Position Value: {format_currency(quantity * price * self.leverage)}")
+        self.logger.info(f"Position Sizing: {sizing_details}")
+        self.logger.info(validation_msg)
         
         # Create position
         self.position = Position(
@@ -276,18 +336,36 @@ class TradingBot:
         
         # Execute order (simulation or real)
         if not self.is_simulation:
-            order = self.exchange.create_market_buy(
-                symbol=self.symbol,
-                quantity=quantity
-            )
+            if self.is_futures and self.futures_executor:
+                # Futures order execution
+                order = self.futures_executor.create_market_order(
+                    symbol=self.symbol,
+                    side='BUY',
+                    quantity=quantity,
+                    position_side='BOTH'  # Can be changed to 'LONG' for hedge mode
+                )
+            else:
+                # Spot order execution
+                order = self.exchange.create_market_buy(
+                    symbol=self.symbol,
+                    quantity=quantity
+                )
+            
             if not order:
                 self.logger.error("❌ Failed to execute buy order")
                 self.position = None
                 return
         
-        # Update balance
-        self.current_balance = 0.0
-        self.stats.current_balance = 0.0
+        # Update balance (for Futures, this is margin used)
+        if self.is_futures:
+            # In Futures, we only use margin, not full balance
+            margin_used = (quantity * price) / self.leverage
+            self.current_balance -= margin_used
+        else:
+            # In Spot, we use full balance
+            self.current_balance = 0.0
+        
+        self.stats.current_balance = self.current_balance
         
         # Send notification
         self.notifier.send_trade_notification(
@@ -306,16 +384,35 @@ class TradingBot:
     
     def _execute_sell(self, position: Position, price: float, reason: str):
         """
-        Execute a sell order
+        Execute a sell order with risk validation
         
         Args:
             position: Current position
             price: Sell price
             reason: Sell reason
         """
+        # Validate position close
+        is_valid, validation_msg = self.risk_manager.validate_position_close(
+            position=position,
+            current_price=price,
+            reason=reason
+        )
+        
+        if not is_valid:
+            self.logger.error(f"❌ Position close blocked: {validation_msg}")
+            return
+        
         # Calculate P&L
-        sell_value = position.quantity * price
-        profit_loss = sell_value - (position.quantity * position.entry_price)
+        if self.is_futures:
+            # For Futures, P&L is calculated with leverage
+            entry_value = position.quantity * position.entry_price
+            exit_value = position.quantity * price
+            profit_loss = exit_value - entry_value
+        else:
+            # For Spot, standard calculation
+            sell_value = position.quantity * price
+            profit_loss = sell_value - (position.quantity * position.entry_price)
+        
         profit_loss_pct = (profit_loss / (position.quantity * position.entry_price)) * 100
         
         # Determine result
@@ -334,20 +431,44 @@ class TradingBot:
         self.logger.info(f"P&L: {format_currency(profit_loss)} ({format_percentage(profit_loss_pct)})")
         self.logger.info(f"Time Held: {time_held:.1f} minutes")
         self.logger.info(f"RSI: {self.current_rsi:.2f}")
+        if self.is_futures:
+            self.logger.info(f"Leverage: {self.leverage}x")
         
         # Execute order (simulation or real)
         if not self.is_simulation:
-            order = self.exchange.create_market_sell(
-                symbol=self.symbol,
-                quantity=position.quantity
+            if self.is_futures and self.futures_executor:
+                # Futures order execution
+                order = self.futures_executor.create_market_order(
+                    symbol=self.symbol,
+                    side='SELL',
+                    quantity=position.quantity,
+                    position_side='BOTH',
+                    reduce_only=True
+                )
+            else:
+                # Spot order execution
+                order = self.exchange.create_market_sell(
+                    symbol=self.symbol,
+                    quantity=position.quantity
             )
             if not order:
                 self.logger.error("❌ Failed to execute sell order")
                 return
         
         # Update balance
-        self.current_balance = sell_value
-        self.stats.current_balance = sell_value
+        if self.is_futures:
+            # For Futures, return margin and add P&L
+            margin_used = (position.quantity * position.entry_price) / self.leverage
+            self.current_balance += margin_used + profit_loss
+        else:
+            # For Spot, receive sell value
+            sell_value = position.quantity * price
+            self.current_balance = sell_value
+        
+        self.stats.current_balance = self.current_balance
+        
+        # Log risk status after trade
+        self.risk_manager.log_risk_status(self.current_balance, self.stats)
         
         # Create trade record
         trade = Trade(
@@ -410,9 +531,11 @@ class TradingBot:
         Returns:
             Status dictionary
         """
-        return {
+        status = {
             'is_running': self.is_running,
             'is_simulation': self.is_simulation,
+            'trading_mode': self.trading_mode,
+            'is_futures': self.is_futures,
             'symbol': self.symbol,
             'current_price': self.current_price,
             'current_rsi': self.current_rsi,
@@ -422,4 +545,18 @@ class TradingBot:
             'strategy_status': self.strategy.get_status_message(self.position, self.current_rsi),
             'oversold_intensity': round(self.strategy.oversold_intensity, 2),
             'oversold_counter': self.strategy.oversold_counter
+        }
+        
+        # Add Futures-specific information
+        if self.is_futures:
+            status['leverage'] = self.leverage
+            status['margin_type'] = self.config.trading.MARGIN_TYPE
+        
+        # Add risk management status
+        status['risk_status'] = self.risk_manager.get_risk_status(
+            self.current_balance,
+            self.stats
+        )
+        
+        return status
         }
