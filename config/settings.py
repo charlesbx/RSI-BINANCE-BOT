@@ -51,9 +51,9 @@ class TradingConfig:
     SELL_AT_LOSS_2_0_HOURS: int = 3  # Sell at -2% after 3 hours
     
     # Buy conditions
-    MIN_RSI_COUNTER: int = 200  # Minimum RSI oversold occurrences before buy
-    RSI_BOUNCE_THRESHOLD: int = 5  # RSI bounce to confirm buy signal
-    MIN_TIME_AFTER_SELL: int = 10  # Minutes to wait after sell before buying
+    MIN_RSI_COUNTER: int = 3  # Minimum RSI oversold occurrences before buy
+    RSI_BOUNCE_THRESHOLD: int = 3  # RSI bounce to confirm buy signal
+    MIN_TIME_AFTER_SELL: int = 5  # Minutes to wait after sell before buying
     
     # Simulation mode
     SIMULATION_MODE: bool = os.getenv("SIMULATION_MODE", "true").lower() == "true"
