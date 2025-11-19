@@ -1,0 +1,27 @@
+# Core Dependencies
+python-binance==1.0.19
+websocket-client==1.6.4
+python-dotenv==1.0.0
+
+# Technical Analysis
+# Note: TA-Lib requires system dependencies. Using pandas-ta as pure Python alternative.
+# To use TA-Lib instead: Install system package first (see INSTALLATION.md)
+# talib==0.4.28
+pandas>=1.3.0
+pandas-ta>=0.3.14b
+numpy>=1.21.0
+
+# API & Web Framework
+flask==3.0.0
+flask-cors==4.0.0
+flask-socketio==5.3.5
+
+# Database (optional)
+sqlalchemy==2.0.23
+
+# Logging & Monitoring
+colorlog==6.8.0
+
+# Testing
+pytest==7.4.3
+pytest-cov==4.1.0
