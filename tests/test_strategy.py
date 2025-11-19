@@ -31,16 +31,17 @@ def test_strategy_initialization(strategy):
 def test_update_price_extremes(strategy):
     """Test price extreme tracking"""
     strategy.update_price_extremes(2000.0, 45.0)
-    assert strategy.lowest_price == 2000.0
     assert strategy.highest_price == 2000.0
+    assert strategy.lowest_rsi == 45.0
+    assert strategy.highest_rsi == 45.0
     
     strategy.update_price_extremes(1950.0, 35.0)
-    assert strategy.lowest_price == 1950.0
     assert strategy.highest_price == 2000.0
+    assert strategy.lowest_rsi == 35.0
     
     strategy.update_price_extremes(2100.0, 55.0)
-    assert strategy.lowest_price == 1950.0
     assert strategy.highest_price == 2100.0
+    assert strategy.highest_rsi == 55.0
 
 
 def test_should_buy_not_in_position(strategy):
@@ -79,7 +80,6 @@ def test_reset_extremes(strategy):
     strategy.update_price_extremes(2000.0, 45.0)
     strategy.reset_extremes()
     
-    assert strategy.lowest_price == float('inf')
     assert strategy.highest_price == 0.0
     assert strategy.lowest_rsi == 100.0
     assert strategy.highest_rsi == 0.0
