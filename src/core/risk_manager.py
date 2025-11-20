@@ -101,6 +101,7 @@ class RiskManager:
         current_balance: float,
         position_size: float,
         entry_price: float,
+        leverage: int = 1,
         stats: Optional[TradingStats] = None
     ) -> Tuple[bool, str]:
         """
@@ -119,12 +120,12 @@ class RiskManager:
         if current_balance <= 0:
             return False, "❌ TRADE BLOCKED: Insufficient balance ($0)"
         
-        # Check if position size is valid
+        # Check if position size is valid (with leverage)
         trade_value = position_size * entry_price
-        if trade_value > current_balance * 1.01:  # Allow 1% tolerance
+        if trade_value > current_balance * leverage * 1.01:  # Allow 1% tolerance
             return False, (
                 f"❌ TRADE BLOCKED: Position size (${trade_value:.2f}) "
-                f"exceeds available balance (${current_balance:.2f})"
+                f"exceeds available balance with {leverage}x leverage (${current_balance * leverage:.2f})"
             )
         
         # Check drawdown limit

@@ -331,6 +331,7 @@ class TradingBot:
             current_balance=self.current_balance,
             position_size=quantity,
             entry_price=price,
+            leverage=self.leverage,
             stats=self.stats
         )
         
@@ -432,6 +433,7 @@ class TradingBot:
             current_balance=self.current_balance,
             position_size=quantity,
             entry_price=price,
+            leverage=self.leverage,
             stats=self.stats
         )
         
